@@ -63,7 +63,8 @@ input,select{font-family:'Inter',sans-serif;}
 .stat-chip.timer b{color:var(--blue);}
 .stat-chip.timer.low b{color:var(--red);}
 .main-grid{display:grid;grid-template-columns:220px 1fr 260px;gap:16px;padding:16px 22px;flex:1;}
-@media (max-width:980px){.main-grid{grid-template-columns:1fr;}}
+.main-grid.two-col{grid-template-columns:260px 1fr;}
+@media (max-width:980px){.main-grid, .main-grid.two-col{grid-template-columns:1fr;}}
 .panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:16px;}
 .panel h3{margin:0 0 12px;font-size:14px;font-weight:500;color:var(--muted);text-transform:none;letter-spacing:0.3px;}
 
@@ -125,13 +126,38 @@ input,select{font-family:'Inter',sans-serif;}
 
 /* shootout */
 .duel{display:flex;justify-content:center;gap:40px;flex-wrap:wrap;margin:20px 0;}
-.duel-side{text-align:center;}
+.duel-side{text-align:center;padding:10px 16px;border-radius:10px;transition:.2s;}
 .duel-side .nm{font-family:'Oswald',sans-serif;font-size:22px;}
+.duel-side.active{box-shadow:0 0 0 2px var(--gold-dim),0 0 30px 6px rgba(232,178,61,0.35);background:rgba(232,178,61,0.06);}
 .duel-side.active .nm{color:var(--gold);}
 .kicks{display:flex;gap:6px;justify-content:center;margin-top:10px;}
 .kick{width:26px;height:26px;border-radius:50%;background:var(--panel-2);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:14px;}
 .kick.hit{background:var(--green);color:#06210f;border-color:var(--green);}
 .kick.miss{background:var(--red);color:#2a0709;border-color:var(--red);}
+
+/* podiums */
+.podium-row{display:flex;gap:14px;flex-wrap:wrap;justify-content:center;padding:18px 22px 4px;}
+.podium{position:relative;display:flex;flex-direction:column;align-items:center;padding:14px 16px 0;min-width:100px;animation:podiumIn .3s ease;}
+@keyframes podiumIn{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
+.podium-name{font-family:'Oswald',sans-serif;font-size:16px;white-space:nowrap;z-index:2;}
+.podium-acc{font-size:11px;color:var(--muted);margin-top:2px;z-index:2;}
+.podium-base{width:100%;height:14px;margin-top:10px;background:linear-gradient(180deg,var(--panel-2),var(--line));border-radius:4px 4px 0 0;border-top:2px solid var(--line);}
+.podium.dead{opacity:0.35;}
+.podium.spotlight .podium-name{color:var(--gold);font-size:19px;}
+.podium.spotlight .podium-base{background:linear-gradient(180deg,#3a2f10,var(--gold-dim));border-top-color:var(--gold);}
+.podium.spotlight{box-shadow:0 0 0 1px var(--gold-dim);border-radius:10px;}
+.spotlight-beam{position:absolute;top:-30px;left:50%;width:90px;height:90px;transform:translateX(-50%);background:radial-gradient(ellipse at top, rgba(232,178,61,0.45), transparent 70%);pointer-events:none;z-index:1;}
+.podium.selectable{cursor:pointer;}
+
+/* keyboard hint */
+.kbd{display:inline-block;margin-left:8px;padding:1px 7px;border-radius:4px;background:rgba(0,0,0,0.28);font-size:11px;font-family:monospace;letter-spacing:0.5px;}
+
+/* answer view (second screen) */
+.av-wrap{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:30px;background:#05070d;}
+.av-label{color:var(--muted);font-size:14px;margin-bottom:10px;}
+.av-question{font-size:clamp(20px,4vw,30px);font-weight:600;max-width:700px;margin-bottom:20px;}
+.av-answer{font-family:'Oswald',sans-serif;color:var(--green);font-size:clamp(36px,7vw,64px);line-height:1.1;}
+.av-turn{color:var(--blue);font-family:'Oswald',sans-serif;font-size:28px;margin-top:10px;}
 
 /* game over */
 .gameover{text-align:center;padding:40px 20px;}
@@ -212,6 +238,7 @@ var peer = null;
 
 var H = null;              // host authoritative state
 var hostConns = {};        // playerId -> DataConnection
+var hostAnswerConns = [];  // DataConnections for connected answer-view (2nd screen) devices
 var customQuestionsDraft = ''; // mirrors the #customQuestions textarea across re-renders
 var csvParsedQuestions = null; // [q,a] pairs parsed from an uploaded CSV, pending confirmation
 var csvFileName = null;
@@ -223,6 +250,10 @@ var P = {                  // player-side local wrapper
   localVoted: false, bankFlash: false
 };
 
+var AV = {                 // answer-view (2nd screen) local wrapper
+  conn: null, roomCode: '', state: null, error: null, connLost: false
+};
+
 /* ============================== HOST STATE ============================== */
 function newHostState(){
   return {
@@ -232,6 +263,7 @@ function newHostState(){
     currentAskedId:null, currentQuestion:null,
     timer:{endsAt:0,duration:60,running:false},
     votes:{}, lastElimination:null, tieCandidates:null, tieTally:null,
+    revealing:false, revealOrder:null, revealIndex:0,
     bankCallPending:false, shootout:null, winner:null,
     log:[], _deck:[], questionBank:QUESTIONS.slice(), usingCustom:false
   };
@@ -325,6 +357,7 @@ function hostCreateRoom(durationSeconds){
   H.roundDuration = durationSeconds;
   H.timer.duration = durationSeconds;
   H.roomCode = genRoomCode();
+  hostConns = {}; hostAnswerConns = [];
   customQuestionsDraft = ''; csvParsedQuestions = null; csvFileName = null; showQuestionBank = false;
   try{
     peer = new Peer('wlink-' + H.roomCode, {debug:0});
@@ -336,8 +369,9 @@ function hostCreateRoom(durationSeconds){
   peer.on('open', function(){ H.ready = true; render(); });
   peer.on('connection', function(conn){
     conn.on('data', function(data){ handlePlayerMessage(conn, data); });
-    conn.on('close', function(){ markPlayerDisconnected(conn); });
+    conn.on('close', function(){ handleHostSideDisconnect(conn); });
   });
+  peer.on('disconnected', function(){ try{ peer.reconnect(); }catch(e){} });
   peer.on('error', function(err){
     H.error = (err && err.type === 'unavailable-id')
       ? 'That room code is already in use — try again.'
@@ -349,6 +383,12 @@ function hostCreateRoom(durationSeconds){
 
 function handlePlayerMessage(conn, msg){
   if (!H) return;
+  if (msg.type === 'joinAnswerView'){
+    if (hostAnswerConns.indexOf(conn) === -1) hostAnswerConns.push(conn);
+    conn.send({type:'welcomeAnswerView', roomCode:H.roomCode});
+    conn.send({type:'answerState', state: sanitizeForAnswerView()});
+    return;
+  }
   if (msg.type === 'join'){
     var p = null;
     if (msg.rejoinId){
@@ -390,7 +430,9 @@ function handlePlayerMessage(conn, msg){
   }
 }
 
-function markPlayerDisconnected(conn){
+function handleHostSideDisconnect(conn){
+  var avIdx = hostAnswerConns.indexOf(conn);
+  if (avIdx !== -1){ hostAnswerConns.splice(avIdx, 1); return; }
   var player = null;
   for (var pid in hostConns){ if (hostConns[pid] === conn) player = H.players.filter(function(pl){return pl.id===pid;})[0]; }
   if (player){ player.connected = false; pushLog(player.name + ' disconnected'); broadcastState(); render(); }
@@ -404,6 +446,18 @@ function sanitizeShootout(s){
   };
 }
 function sanitizeForPlayer(forPlayer){
+  var revealInfo = null;
+  if (H.revealing && H.revealOrder){
+    var targetId = H.revealOrder[H.revealIndex];
+    var voter = H.players.filter(function(p){return p.id===targetId;})[0];
+    var votedForId = H.votes[targetId];
+    var votedFor = votedForId ? H.players.filter(function(p){return p.id===votedForId;})[0] : null;
+    revealInfo = {
+      voterName: voter ? voter.name : '',
+      votedForName: votedFor ? votedFor.name : null,
+      index: H.revealIndex, total: H.revealOrder.length
+    };
+  }
   return {
     phase: H.phase, roomCode: H.roomCode,
     players: H.players.map(function(p){ return {id:p.id,name:p.name,alive:p.alive,correct:p.correct,incorrect:p.incorrect,connected:p.connected}; }),
@@ -415,8 +469,29 @@ function sanitizeForPlayer(forPlayer){
     timer: H.timer,
     myId: forPlayer.id,
     votedAlready: !!H.votes[forPlayer.id],
+    revealing: H.revealing, revealInfo: revealInfo,
     lastElimination: H.lastElimination,
     shootout: H.shootout ? sanitizeShootout(H.shootout) : null,
+    winner: H.winner || null
+  };
+}
+function sanitizeShootoutForAnswerView(s){
+  return {
+    order: s.order.map(function(id){ return {id:id, name:(H.players.filter(function(p){return p.id===id;})[0]||{}).name}; }),
+    currentTurn: s.currentTurn, sudden: s.sudden, winnerId: s.winnerId,
+    currentQuestion: s.currentQuestion ? {q:s.currentQuestion[0], a:s.currentQuestion[1]} : null
+  };
+}
+function sanitizeForAnswerView(){
+  var askedPlayer = H.players.filter(function(p){return p.id===H.currentAskedId;})[0];
+  return {
+    phase: H.phase, roomCode: H.roomCode, round: H.round,
+    bank: H.bank, chainIndex: H.chainIndex,
+    askedName: askedPlayer ? askedPlayer.name : null,
+    bankCallPending: H.bankCallPending,
+    currentQuestion: H.currentQuestion ? {q:H.currentQuestion[0], a:H.currentQuestion[1]} : null,
+    lastElimination: H.lastElimination,
+    shootout: H.shootout ? sanitizeShootoutForAnswerView(H.shootout) : null,
     winner: H.winner || null
   };
 }
@@ -425,6 +500,10 @@ function broadcastState(){
     var conn = hostConns[p.id];
     if (!conn || !conn.open) return;
     conn.send({type:'state', state: sanitizeForPlayer(p)});
+  });
+  hostAnswerConns.forEach(function(conn){
+    if (!conn || !conn.open) return;
+    conn.send({type:'answerState', state: sanitizeForAnswerView()});
   });
 }
 
@@ -490,6 +569,7 @@ Actions.startGame = function(){
   if (H.players.length < 3){ alert('You need at least 3 players to start.'); return; }
   H.phase = 'playing'; H.round = 1; H.chainIndex = -1;
   H.currentAskedId = H.players[0].id;
+  H.currentQuestion = pullQuestion();
   startTimer();
   pushLog('Game started with ' + H.players.length + ' players');
   broadcastState(); render();
@@ -500,6 +580,7 @@ Actions.selectAsked = function(playerId){
   var p = H.players.filter(function(pl){return pl.id===playerId && pl.alive;})[0];
   if (!p) return;
   H.currentAskedId = playerId;
+  H.currentQuestion = pullQuestion();
   H.bankCallPending = false;
   broadcastState(); render();
 };
@@ -522,9 +603,10 @@ Actions.markCorrect = function(){
   var p = H.players.filter(function(pl){return pl.id===H.currentAskedId;})[0];
   p.correct++;
   H.chainIndex = Math.min(H.chainIndex+1, CHAIN_VALUES.length-1);
-  H.currentQuestion = null;
   pushLog('\u2705 ' + p.name + ' correct \u2014 chain at ' + fmtMoney(CHAIN_VALUES[H.chainIndex]));
   advanceTurn();
+  H.currentQuestion = pullQuestion();
+  H.bankCallPending = false;
   broadcastState(); render();
 };
 Actions.markIncorrect = function(){
@@ -533,8 +615,9 @@ Actions.markIncorrect = function(){
   p.incorrect++;
   pushLog('\u274C ' + p.name + ' incorrect \u2014 chain reset');
   H.chainIndex = -1;
-  H.currentQuestion = null;
   advanceTurn();
+  H.currentQuestion = pullQuestion();
+  H.bankCallPending = false;
   broadcastState(); render();
 };
 
@@ -554,6 +637,7 @@ function startTimer(){
 Actions.endRound = function(){
   if (H.phase !== 'playing') return;
   H.phase = 'voting'; H.votes = {}; H.currentQuestion = null;
+  H.revealing = false; H.revealOrder = null; H.revealIndex = 0;
   H.timer.running = false;
   pushLog('Round ' + H.round + ' ended \u2014 time to vote');
   broadcastState(); render();
@@ -569,7 +653,23 @@ setInterval(function(){
   if (role === 'player' && P.state && P.state.phase === 'playing') render();
 }, 1000);
 
-Actions.forceRevealVotes = function(){ resolveVotes(); };
+Actions.startVoteReveal = function(){
+  if (H.phase !== 'voting' || H.revealing) return;
+  H.revealOrder = H.players.filter(function(p){return p.alive;}).map(function(p){return p.id;});
+  H.revealIndex = 0;
+  H.revealing = true;
+  broadcastState(); render();
+};
+Actions.advanceReveal = function(){
+  if (!H.revealing || !H.revealOrder) return;
+  H.revealIndex++;
+  if (H.revealIndex >= H.revealOrder.length){
+    H.revealing = false;
+    resolveVotes();
+    return;
+  }
+  broadcastState(); render();
+};
 
 function resolveVotes(){
   var alive = H.players.filter(function(p){return p.alive;});
@@ -619,11 +719,11 @@ Actions.continueAfterElimination = function(){
   var alive = H.players.filter(function(p){return p.alive;});
   if (alive.length === 2){
     H.phase = 'shootout';
-    H.shootout = {order:[alive[0].id, alive[1].id], rounds:[], currentRoundIndex:0, currentTurn:0, currentQuestion:null, sudden:false, winnerId:null};
+    H.shootout = {order:[alive[0].id, alive[1].id], rounds:[], currentRoundIndex:0, currentTurn:0, currentQuestion:pullQuestion(), sudden:false, winnerId:null};
     pushLog('Final 2! Penalty shootout begins');
   } else {
     H.phase = 'playing'; H.round++; H.chainIndex = -1;
-    H.currentAskedId = alive[0].id; H.currentQuestion = null;
+    H.currentAskedId = alive[0].id; H.currentQuestion = pullQuestion();
     startTimer();
   }
   broadcastState(); render();
@@ -654,6 +754,7 @@ Actions.shootoutMark = function(result){
   if (!s.winnerId){
     if (s.currentTurn === 0){ s.currentTurn = 1; }
     else { s.currentTurn = 0; s.currentRoundIndex++; }
+    s.currentQuestion = pullQuestion();
   }
   broadcastState(); render();
 };
@@ -698,42 +799,87 @@ Actions.playAgain = function(){
 };
 
 /* ============================== PLAYER NETWORKING ============================== */
-Actions.joinRoom = function(){
-  var name = (($('#playerName')||{}).value || '').trim();
-  var code = (($('#roomCodeInput')||{}).value || '').trim().toUpperCase();
-  if (!name || !code){ alert('Enter your name and the room code.'); return; }
+function getPlayerSession(){
+  try{ return JSON.parse(sessionStorage.getItem('wlink_session') || 'null'); } catch(e){ return null; }
+}
+function savePlayerSession(obj){
+  try{ sessionStorage.setItem('wlink_session', JSON.stringify(obj)); } catch(e){}
+}
+function clearPlayerSession(){
+  try{ sessionStorage.removeItem('wlink_session'); } catch(e){}
+}
+
+function connectPlayerToHost(code, name){
   role = 'player';
   P.roomCode = code; P.myName = name;
+  P.error = null;
+  savePlayerSession({roomCode: code, name: name, playerId: (getPlayerSession()||{}).playerId || null});
+  function doConnect(){
+    var conn = peer.connect('wlink-' + code, {reliable:true});
+    P.conn = conn;
+    conn.on('open', function(){
+      var sess = getPlayerSession();
+      conn.send({type:'join', name:name, rejoinId: sess ? sess.playerId : null});
+      P.connLost = false;
+      render();
+    });
+    conn.on('data', function(d){ handleHostMessage(d); });
+    conn.on('close', function(){
+      P.connLost = true; render();
+      if (role === 'player' && !P.error) scheduleReconnect(code, name);
+    });
+  }
+  if (peer && !peer.destroyed && peer.open){
+    doConnect(); render(); return;
+  }
   try{
     peer = new Peer(undefined, {debug:0});
   } catch(e){
     P.error = 'Could not start a connection. Try again.';
     render(); return;
   }
-  peer.on('open', function(){
-    var conn = peer.connect('wlink-' + code, {reliable:true});
-    P.conn = conn;
-    conn.on('open', function(){
-      conn.send({type:'join', name:name, rejoinId: sessionStorage.getItem('wlink_' + code)});
-    });
-    conn.on('data', function(d){ handleHostMessage(d); });
-    conn.on('close', function(){ P.connLost = true; render(); });
-    render();
-  });
+  peer.on('open', function(){ doConnect(); render(); });
+  peer.on('disconnected', function(){ try{ peer.reconnect(); }catch(e){} });
   peer.on('error', function(err){
-    P.error = (err && err.type === 'peer-unavailable')
-      ? 'Room not found. Double-check the code with your host.'
-      : 'Connection error (' + (err && err.type) + '). Check your internet and try again.';
+    if (err && err.type === 'peer-unavailable'){
+      P.error = 'Room not found. Double-check the code with your host.';
+      clearPlayerSession();
+    } else {
+      P.connLost = true;
+      scheduleReconnect(code, name);
+    }
     render();
   });
   render();
+}
+var reconnectTimer = null;
+function scheduleReconnect(code, name){
+  if (reconnectTimer) return;
+  reconnectTimer = setTimeout(function(){
+    reconnectTimer = null;
+    if (role === 'player' && P.connLost) connectPlayerToHost(code, name);
+  }, 3000);
+}
+
+Actions.joinRoom = function(){
+  var name = (($('#playerName')||{}).value || '').trim();
+  var code = (($('#roomCodeInput')||{}).value || '').trim().toUpperCase();
+  if (!name || !code){ alert('Enter your name and the room code.'); return; }
+  connectPlayerToHost(code, name);
 };
-Actions.retryJoin = function(){ localView = 'playerSetup'; role = null; P = {conn:null,roomCode:'',myName:'',myId:null,state:null,error:null,denied:null,connLost:false,localVoted:false,bankFlash:false}; render(); };
+Actions.reconnectNow = function(){
+  if (P.roomCode && P.myName) connectPlayerToHost(P.roomCode, P.myName);
+};
+Actions.retryJoin = function(){
+  localView = 'playerSetup'; role = null; clearPlayerSession();
+  P = {conn:null,roomCode:'',myName:'',myId:null,state:null,error:null,denied:null,connLost:false,localVoted:false,bankFlash:false};
+  render();
+};
 
 function handleHostMessage(msg){
   if (msg.type === 'welcome'){
     P.myId = msg.playerId;
-    sessionStorage.setItem('wlink_' + P.roomCode, msg.playerId);
+    savePlayerSession({roomCode: P.roomCode, name: P.myName, playerId: msg.playerId});
     P.denied = null;
     render();
   } else if (msg.type === 'state'){
@@ -742,6 +888,7 @@ function handleHostMessage(msg){
     render();
   } else if (msg.type === 'denied'){
     P.denied = msg.reason;
+    clearPlayerSession();
     render();
   }
 }
@@ -759,6 +906,50 @@ Actions.callBank = function(){
   setTimeout(function(){ P.bankFlash = false; render(); }, 2500);
 };
 
+/* ============================== ANSWER-VIEW (2ND SCREEN) NETWORKING ============================== */
+function connectAnswerViewToHost(code){
+  role = 'answerView';
+  AV.roomCode = code; AV.error = null;
+  try{
+    peer = new Peer(undefined, {debug:0});
+  } catch(e){
+    AV.error = 'Could not start a connection. Try again.';
+    render(); return;
+  }
+  peer.on('open', function(){
+    var conn = peer.connect('wlink-' + code, {reliable:true});
+    AV.conn = conn;
+    conn.on('open', function(){ conn.send({type:'joinAnswerView'}); AV.connLost = false; render(); });
+    conn.on('data', function(d){
+      if (d.type === 'answerState'){ AV.state = d.state; AV.connLost = false; render(); }
+    });
+    conn.on('close', function(){
+      AV.connLost = true; render();
+      setTimeout(function(){ if (role === 'answerView' && AV.connLost) connectAnswerViewToHost(code); }, 3000);
+    });
+    render();
+  });
+  peer.on('disconnected', function(){ try{ peer.reconnect(); }catch(e){} });
+  peer.on('error', function(err){
+    AV.error = (err && err.type === 'peer-unavailable')
+      ? 'Room not found. Double-check the code with your host.'
+      : 'Connection error (' + (err && err.type) + '). Check your internet and try again.';
+    render();
+  });
+  render();
+}
+Actions.goAnswerViewSetup = function(){ localView = 'answerViewSetup'; render(); };
+Actions.joinAnswerView = function(){
+  var code = (($('#avRoomCodeInput')||{}).value || '').trim().toUpperCase();
+  if (!code){ alert('Enter the room code.'); return; }
+  connectAnswerViewToHost(code);
+};
+Actions.retryAnswerView = function(){
+  localView = 'answerViewSetup'; role = null;
+  AV = {conn:null, roomCode:'', state:null, error:null, connLost:false};
+  render();
+};
+
 /* ============================== VIEWS: LANDING / SETUP ============================== */
 function landingView(){
   return '' +
@@ -769,6 +960,7 @@ function landingView(){
       '<button class="big-btn gold" data-action="goHostSetup">Host a game</button>' +
       '<button class="big-btn ghost" data-action="goPlayerSetup">Join a game</button>' +
     '</div>' +
+    '<button class="back-link" style="margin-top:26px;" data-action="goAnswerViewSetup">Hosting? Open the answer view (2nd screen) \u2192</button>' +
   '</div>';
 }
 function hostSetupView(){
@@ -802,6 +994,19 @@ function playerSetupView(){
     '</div>' +
   '</div>';
 }
+function answerViewSetupView(){
+  return '' +
+  '<div class="landing">' +
+    '<div class="setup-card">' +
+      '<button class="back-link" data-action="goBack">\u2190 Back</button>' +
+      '<h2 style="margin:0;">Answer view</h2>' +
+      '<p style="color:var(--muted);font-size:13px;margin:10px 0 0;">Open this on a second device (like your phone) while the main game is on the shared screen. It shows the current question\'s answer privately \u2014 handy for reading it out loud without the audience seeing.</p>' +
+      '<label for="avRoomCodeInput">Room code</label>' +
+      '<input id="avRoomCodeInput" maxlength="4" placeholder="e.g. QWXK" autocomplete="off" style="text-transform:uppercase;letter-spacing:3px;">' +
+      '<button class="big-btn gold full-btn" data-action="joinAnswerView">Open answer view</button>' +
+    '</div>' +
+  '</div>';
+}
 
 /* ============================== VIEWS: HOST ============================== */
 function ladderHtml(chainIndex){
@@ -810,14 +1015,18 @@ function ladderHtml(chainIndex){
     return '<div class="'+cls+'">'+fmtMoney(v)+'</div>';
   }).join('') + '</div>';
 }
-function rosterHtml(players, currentAskedId, selectable){
-  return '<div class="roster">' + players.map(function(p){
-    var cls = 'chip' + (p.id===currentAskedId?' selected':'') + (!p.alive?' dead':'');
+function podiumRow(players, opts){
+  opts = opts || {};
+  return '<div class="podium-row">' + players.map(function(p){
+    var isSpot = p.id === opts.highlightId;
+    var cls = 'podium' + (isSpot ? ' spotlight' : '') + (opts.selectable ? ' selectable' : '');
     var acc = accuracyOf(p);
-    var action = (selectable && p.alive) ? ' data-action="selectAsked" data-arg="'+p.id+'"' : '';
-    return '<div class="'+cls+'" style="'+(selectable&&p.alive?'cursor:pointer;':'')+'"'+action+'>' +
-      '<div><span class="dot'+(p.connected?'':' off')+'"></span><span class="nm">'+esc(p.name)+'</span>' +
-      '<div class="sub">'+p.correct+'\u2713 / '+p.incorrect+'\u2717'+(acc!==null?' \u00b7 '+acc+'%':'')+'</div></div>' +
+    var action = opts.selectable ? ' data-action="selectAsked" data-arg="'+p.id+'"' : '';
+    return '<div class="'+cls+'"'+action+'>' +
+      (isSpot ? '<div class="spotlight-beam"></div>' : '') +
+      '<div class="podium-name">'+esc(p.name)+(p.connected===false?' \uD83D\uDCF5':'')+'</div>' +
+      (opts.showAccuracy ? '<div class="podium-acc">'+(acc===null?'\u2014':acc+'%')+' \u00b7 '+p.correct+'\u2713/'+p.incorrect+'\u2717</div>' : '') +
+      '<div class="podium-base"></div>' +
     '</div>';
   }).join('') + '</div>';
 }
@@ -855,15 +1064,12 @@ function topBarHtml(extraChips){
 }
 
 function hostLobbyView(){
-  var list = H.players.length ? H.players.map(function(p){
-    return '<div class="chip"><span><span class="dot"></span>'+esc(p.name)+'</span></div>';
-  }).join('') : '<p class="center-msg" style="padding:10px;">Waiting for players to join\u2026</p>';
   return '' +
   '<div class="top-bar"><div class="room-pill">ROOM '+esc(H.roomCode)+'</div><div class="stat-strip"><span class="stat-chip"><b>'+H.players.length+'</b>Joined</span></div></div>' +
   '<div style="padding:24px 22px;max-width:640px;margin:0 auto;width:100%;text-align:center;">' +
     '<p style="color:var(--muted);">Have everyone go to this page and tap <b style="color:var(--text);">Join a game</b>, then enter this code:</p>' +
     '<h1 class="display" style="font-size:64px;letter-spacing:10px;color:var(--gold);margin:6px 0 24px;">'+esc(H.roomCode)+'</h1>' +
-    '<div class="panel" style="text-align:left;"><h3>Players</h3><div class="roster">'+list+'</div></div>' +
+    (H.players.length ? podiumRow(H.players, {}) : '<p class="center-msg" style="padding:10px;">Waiting for players to join\u2026</p>') +
     questionBankPanel() +
     '<button class="big-btn gold full-btn" data-action="startGame" style="max-width:320px;">Start game ('+H.players.length+' joined, need 3+)</button>' +
   '</div>';
@@ -914,6 +1120,7 @@ function questionBankPanel(){
 
 function hostPlayingView(){
   var askedPlayer = H.players.filter(function(p){return p.id===H.currentAskedId;})[0];
+  var alive = H.players.filter(function(p){return p.alive;});
   var stage;
   if (H.currentQuestion){
     stage = '<div class="stage">' +
@@ -921,63 +1128,79 @@ function hostPlayingView(){
       '<div class="q-text">'+esc(H.currentQuestion[0])+'</div>' +
       '<div class="a-text">Answer: '+esc(H.currentQuestion[1])+'</div>' +
       '<div class="action-row">' +
-        '<button class="act-btn correct" data-action="markCorrect">Correct</button>' +
-        '<button class="act-btn incorrect" data-action="markIncorrect">Incorrect</button>' +
+        '<button class="act-btn correct" data-action="markCorrect">Correct <span class="kbd">C</span></button>' +
+        '<button class="act-btn incorrect" data-action="markIncorrect">Incorrect <span class="kbd">I</span></button>' +
       '</div>' +
+      '<div class="action-row" style="margin-top:8px;"><button class="act-btn neutral" data-action="nextQuestion">Skip \u2014 new question</button></div>' +
     '</div>';
   } else {
     stage = '<div class="stage">' +
-      (H.bankCallPending ? '<div class="banner">\uD83D\uDD14 '+esc(askedPlayer?askedPlayer.name:'')+' wants to bank the chain!</div>' : '') +
       '<div class="q-label">On the spot</div>' +
       '<div class="q-text" style="color:var(--blue);">'+esc(askedPlayer?askedPlayer.name:'\u2014')+'</div>' +
-      '<div class="action-row">' +
-        '<button class="act-btn primary" data-action="nextQuestion">Ask next question</button>' +
-        '<button class="act-btn bank" data-action="bankChain" '+(H.chainIndex<0?'disabled':'')+'>Bank '+(H.chainIndex>=0?fmtMoney(CHAIN_VALUES[H.chainIndex]):'')+'</button>' +
-      '</div>' +
+      '<div class="action-row"><button class="act-btn primary" data-action="nextQuestion">Ask next question</button></div>' +
     '</div>';
   }
   var logHtml = '<div class="log">' + H.log.map(function(l){ return '<div>'+esc(l.msg)+'</div>'; }).join('') + '</div>';
   return '' +
     topBarHtml() +
-    '<div class="main-grid">' +
+    podiumRow(alive, {highlightId: H.currentAskedId, selectable: true, showAccuracy: true}) +
+    '<div class="main-grid two-col">' +
       '<div class="panel"><h3>Chain</h3>'+ladderHtml(H.chainIndex)+
-        '<div class="bank-total"><div class="amt">'+fmtMoney(H.bank)+'</div><div class="lbl">Team bank</div></div></div>' +
-      '<div class="panel">'+stage+'<div class="action-row"><button class="act-btn neutral" data-action="endRound">End round now</button></div>'+logHtml+'</div>' +
-      '<div class="panel"><h3>Players \u2014 tap to choose who\'s asked</h3>'+rosterHtml(H.players, H.currentAskedId, true)+'</div>' +
+        '<div class="bank-total"><div class="amt">'+fmtMoney(H.bank)+'</div><div class="lbl">Team bank</div></div>' +
+        (H.bankCallPending ? '<div class="banner" style="margin-top:10px;">\uD83D\uDD14 '+esc(askedPlayer?askedPlayer.name:'')+' wants to bank!</div>' : '') +
+        '<button class="act-btn bank full-btn" data-action="bankChain" '+(H.chainIndex<0?'disabled':'')+'>Bank '+(H.chainIndex>=0?fmtMoney(CHAIN_VALUES[H.chainIndex]):'')+'</button>' +
+      '</div>' +
+      '<div class="panel">'+stage+'<div class="action-row" style="margin-top:14px;"><button class="act-btn neutral" data-action="endRound">End round now</button></div>'+logHtml+'</div>' +
     '</div>';
 }
 
 function hostVotingView(){
   var alive = H.players.filter(function(p){return p.alive;});
-  var votedCount = Object.keys(H.votes).length;
   if (H.tieCandidates){
     var cands = H.players.filter(function(p){return H.tieCandidates.indexOf(p.id)>=0;});
-    return topBarHtml() + '<div style="padding:24px 22px;max-width:520px;margin:0 auto;text-align:center;">' +
+    return topBarHtml() + podiumRow(alive, {}) + '<div style="padding:24px 22px;max-width:520px;margin:0 auto;text-align:center;">' +
       '<h2>It\'s a tie</h2><p class="tag">Performance stats didn\'t break it either. As host, pick who goes home:</p>' +
       '<div class="action-row">'+cands.map(function(p){ return '<button class="act-btn incorrect" data-action="manualTieBreak" data-arg="'+p.id+'">'+esc(p.name)+'</button>'; }).join('')+'</div>' +
     '</div>';
   }
+  if (H.revealing && H.revealOrder){
+    var targetId = H.revealOrder[H.revealIndex];
+    var voter = H.players.filter(function(p){return p.id===targetId;})[0];
+    var votedForId = H.votes[targetId];
+    var votedFor = votedForId ? H.players.filter(function(p){return p.id===votedForId;})[0] : null;
+    var isLast = H.revealIndex === H.revealOrder.length - 1;
+    return topBarHtml() + podiumRow(alive, {highlightId: targetId}) +
+      '<div style="padding:10px 22px;text-align:center;">' +
+      '<p class="tag">Revealing vote '+(H.revealIndex+1)+' of '+H.revealOrder.length+'</p>' +
+      '<div class="elim-card" style="padding:10px;">' +
+        '<div class="q-label">'+esc(voter?voter.name:'')+' voted for</div>' +
+        '<div class="name" style="color:var(--gold);font-size:32px;">'+(votedFor?esc(votedFor.name):'No one \u2014 no vote cast')+'</div>' +
+      '</div>' +
+      '<button class="big-btn gold" data-action="advanceReveal">'+(isLast?'Show result':'Reveal next vote')+'</button>' +
+    '</div>';
+  }
+  var votedCount = Object.keys(H.votes).length;
   var rows = alive.map(function(p){
     var voted = !!H.votes[p.id];
     return '<div class="vote-row"><span>'+esc(p.name)+'</span><span class="'+(voted?'yes':'no')+'">'+(voted?'Voted \u2713':'Waiting\u2026')+'</span></div>';
   }).join('');
-  return topBarHtml() + '<div style="padding:24px 22px;text-align:center;">' +
+  return topBarHtml() + podiumRow(alive, {}) + '<div style="padding:10px 22px;text-align:center;">' +
     '<h2>Voting \u2014 who\'s the weakest link?</h2>' +
     '<p class="tag">'+votedCount+' of '+alive.length+' voted</p>' +
     '<div class="vote-grid">'+rows+'</div>' +
-    '<button class="big-btn gold" style="margin-top:22px;" data-action="forceRevealVotes">Reveal votes</button>' +
+    '<button class="big-btn gold" style="margin-top:22px;" data-action="startVoteReveal">Reveal votes</button>' +
   '</div>';
 }
 
 function hostEliminationView(){
   var e = H.lastElimination;
-  var aliveCount = H.players.filter(function(p){return p.alive;}).length;
-  return topBarHtml() + '<div class="elim-card">' +
+  var alive = H.players.filter(function(p){return p.alive;});
+  return topBarHtml() + podiumRow(alive, {}) + '<div class="elim-card">' +
     '<div class="q-label">Voted off</div>' +
     '<div class="name">'+esc(e.name)+'</div>' +
     (e.note ? '<p class="tag">'+esc(e.note)+'</p>' : '') +
     '<div class="tally">'+e.tally.map(function(t){ return '<div class="r"><span>'+esc(t.name)+'</span><span>'+t.votes+' vote'+(t.votes===1?'':'s')+'</span></div>'; }).join('')+'</div>' +
-    '<button class="big-btn gold" data-action="continueAfterElimination">'+(aliveCount===2?'Continue to final shootout':'Continue to round '+(H.round+1))+'</button>' +
+    '<button class="big-btn gold" data-action="continueAfterElimination">'+(alive.length===2?'Continue to final shootout':'Continue to round '+(H.round+1))+'</button>' +
   '</div>';
 }
 
@@ -1002,8 +1225,8 @@ function hostShootoutView(){
       '<div class="q-text">'+esc(s.currentQuestion[0])+'</div>' +
       '<div class="a-text">Answer: '+esc(s.currentQuestion[1])+'</div>' +
       '<div class="action-row">' +
-        '<button class="act-btn correct" data-action="shootoutMark" data-arg="correct">Correct</button>' +
-        '<button class="act-btn incorrect" data-action="shootoutMark" data-arg="incorrect">Incorrect</button>' +
+        '<button class="act-btn correct" data-action="shootoutMark" data-arg="correct">Correct <span class="kbd">C</span></button>' +
+        '<button class="act-btn incorrect" data-action="shootoutMark" data-arg="incorrect">Incorrect <span class="kbd">I</span></button>' +
       '</div></div>';
   } else {
     stage = '<div class="stage"><div class="q-label">'+(s.sudden?'Sudden death':'Up next')+'</div>' +
@@ -1019,17 +1242,23 @@ function hostShootoutView(){
   '</div>';
 }
 
-function hostGameOverView(){
-  var standings = H.players.slice().sort(function(a,b){
+function standingsHtml(players){
+  var sorted = players.slice().sort(function(a,b){
     if (a.alive !== b.alive) return a.alive ? -1 : 1;
     return (b.correct-b.incorrect) - (a.correct-a.incorrect);
   });
+  return '<div class="standings">'+sorted.map(function(p){
+    var acc = accuracyOf(p);
+    return '<div class="r"><span>'+esc(p.name)+'</span><span>'+(acc===null?'\u2014':acc+'%')+' \u00b7 '+p.correct+'\u2713/'+p.incorrect+'\u2717</span></div>';
+  }).join('')+'</div>';
+}
+function hostGameOverView(){
   return '<div class="gameover">' +
     '<div class="trophy">\uD83C\uDFC6</div>' +
     '<div class="winner">'+esc(H.winner)+' wins!</div>' +
-    '<div class="standings">'+standings.map(function(p){
-      return '<div class="r"><span>'+esc(p.name)+'</span><span>'+p.correct+'\u2713 / '+p.incorrect+'\u2717</span></div>';
-    }).join('')+'</div>' +
+    '<div class="amt" style="font-family:\'Oswald\',sans-serif;font-size:34px;color:var(--gold);margin-bottom:4px;">'+fmtMoney(H.bank)+'</div>' +
+    '<div class="lbl" style="color:var(--muted);font-size:13px;margin-bottom:22px;">Final team bank</div>' +
+    standingsHtml(H.players) +
     '<button class="big-btn gold" style="margin-top:26px;" data-action="playAgain">Play again with same players</button>' +
   '</div>';
 }
@@ -1048,7 +1277,7 @@ function playerRootView(){
   var s = P.state;
   var wrap = '<div class="player-wrap">' +
     '<div class="p-header"><div class="rc">ROOM '+esc(s.roomCode)+'</div></div>' +
-    (P.connLost ? '<div class="error-box">Connection to host lost. Trying to reconnect\u2026</div>' : '');
+    (P.connLost ? '<div class="error-box">Connection to host lost. Trying to reconnect\u2026 <button class="back-link" style="display:inline;padding:0;color:var(--blue);" data-action="reconnectNow">Reconnect now</button></div>' : '');
 
   var me = s.players.filter(function(p){return p.id===s.myId;})[0] || {correct:0,incorrect:0,alive:true};
   var acc = accuracyOf(me);
@@ -1078,10 +1307,22 @@ function playerStatsHtml(me){
     '<div class="p-stat"><b>'+me.incorrect+'</b><span>Incorrect</span></div>' +
   '</div>';
 }
+function allPlayersAccuracyTable(players){
+  var sorted = players.slice().sort(function(a,b){
+    var aa = accuracyOf(a), ba = accuracyOf(b);
+    return (ba===null?-1:ba) - (aa===null?-1:aa);
+  });
+  return '<div class="panel" style="text-align:left;"><h3>Everyone\'s accuracy</h3><div class="roster">' + sorted.map(function(p){
+    var acc = accuracyOf(p);
+    return '<div class="chip'+(!p.alive?' dead':'')+'"><span>'+esc(p.name)+'</span><span class="sub">'+(acc===null?'\u2014':acc+'%')+' \u00b7 '+p.correct+'\u2713/'+p.incorrect+'\u2717</span></div>';
+  }).join('') + '</div></div>';
+}
 
 function playerPlayingView(s, me){
   if (!me.alive){
-    return '<div class="spectator-tag">You\'ve been voted off \u2014 spectating</div>' + playerStatsHtml(me) + '<div class="panel"><h3>Chain</h3>'+ladderHtml(s.chainIndex)+'<div class="bank-total"><div class="amt">'+fmtMoney(s.bank)+'</div><div class="lbl">Team bank</div></div></div>';
+    return '<div class="spectator-tag">You\'ve been voted off \u2014 spectating</div>' +
+      '<div class="panel"><h3>Chain</h3>'+ladderHtml(s.chainIndex)+'<div class="bank-total"><div class="amt">'+fmtMoney(s.bank)+'</div><div class="lbl">Team bank</div></div></div>' +
+      allPlayersAccuracyTable(s.players);
   }
   var isMyTurn = s.currentAskedId === s.myId;
   var askedPlayer = s.players.filter(function(p){return p.id===s.currentAskedId;})[0];
@@ -1093,14 +1334,22 @@ function playerPlayingView(s, me){
   if (s.currentQuestion) out += '<div class="panel" style="text-align:center;"><div class="q-label">Question</div><div class="q-text" style="font-size:19px;">'+esc(s.currentQuestion.q)+'</div></div>';
   out += '<div class="panel"><h3>Chain</h3>'+ladderHtml(s.chainIndex)+'<div class="bank-total"><div class="amt">'+fmtMoney(s.bank)+'</div><div class="lbl">Team bank</div></div></div>';
   if (isMyTurn){
-    out += '<button class="full-btn act-btn bank" data-action="callBank">'+(P.bankFlash ? 'Bank request sent \u2713' : 'Call bank!')+'</button>';
+    out += '<button class="full-btn act-btn bank" data-action="callBank">'+(P.bankFlash ? 'Bank request sent \u2713' : 'Call bank! (you can do this any time on your turn)')+'</button>';
   }
   return out;
 }
 
 function playerVotingView(s, me){
+  if (s.revealing && s.revealInfo){
+    return (!me.alive ? '<div class="spectator-tag">You\'ve been voted off \u2014 spectating</div>' : '') +
+      '<div class="panel" style="text-align:center;">' +
+        '<p class="tag">Revealing vote '+(s.revealInfo.index+1)+' of '+s.revealInfo.total+'</p>' +
+        '<div class="q-label">'+esc(s.revealInfo.voterName)+' voted for</div>' +
+        '<div class="name" style="font-family:\'Oswald\',sans-serif;font-size:28px;color:var(--gold);margin-top:6px;">'+(s.revealInfo.votedForName?esc(s.revealInfo.votedForName):'No one \u2014 no vote cast')+'</div>' +
+      '</div>';
+  }
   if (!me.alive){
-    return '<div class="spectator-tag">You\'ve been voted off \u2014 spectating</div><div class="center-msg">The remaining players are voting on the weakest link.</div>';
+    return '<div class="spectator-tag">You\'ve been voted off \u2014 spectating</div><div class="center-msg">The remaining players are voting on the weakest link.</div>' + allPlayersAccuracyTable(s.players);
   }
   if (s.votedAlready || P.localVoted){
     return '<div class="panel" style="text-align:center;"><h3>Vote submitted</h3><p class="tag">Waiting for the rest of the group\u2026</p></div>';
@@ -1118,7 +1367,7 @@ function playerEliminationView(s, me){
     (e.note?'<p class="tag">'+esc(e.note)+'</p>':'') +
     '<div class="tally">'+e.tally.map(function(t){ return '<div class="r"><span>'+esc(t.name)+'</span><span>'+t.votes+' vote'+(t.votes===1?'':'s')+'</span></div>'; }).join('')+'</div>' +
     (me.alive ? '<p class="tag">Get ready for the next round\u2026</p>' : '<div class="spectator-tag">You\'re spectating the rest of the game</div>') +
-  '</div>';
+  '</div>' + (me.alive ? '' : allPlayersAccuracyTable(s.players));
 }
 
 function playerShootoutView(s, me){
@@ -1140,14 +1389,63 @@ function playerShootoutView(s, me){
     out += '<div class="turn-flag '+(isMyTurn?'yours':'theirs')+'">'+(isMyTurn?"You're up!":'Waiting for your turn')+'</div>';
   } else {
     out += '<div class="turn-flag theirs">'+esc(turnO.name)+' is up</div>';
+    out += allPlayersAccuracyTable(s.players);
   }
   return out;
 }
 
 function playerGameOverView(s, me){
-  var won = s.winner === (s.players.filter(function(p){return p.id===s.myId;})[0]||{}).name;
+  var myName = (s.players.filter(function(p){return p.id===s.myId;})[0]||{}).name;
+  var won = s.winner === myName;
   return '<div class="gameover"><div class="trophy">\uD83C\uDFC6</div><div class="winner">'+esc(s.winner)+' wins!</div>' +
+    '<div class="amt" style="font-family:\'Oswald\',sans-serif;font-size:30px;color:var(--gold);margin-bottom:4px;">'+fmtMoney(s.bank)+'</div>' +
+    '<div class="lbl" style="color:var(--muted);font-size:13px;margin-bottom:18px;">Final team bank</div>' +
     (won ? '<p class="tag">That\'s you \uD83C\uDF89</p>' : '<p class="tag">Thanks for playing!</p>') +
+    standingsHtml(s.players) +
+  '</div>';
+}
+
+/* ============================== VIEWS: ANSWER VIEW (2ND SCREEN) ============================== */
+function answerViewRootView(){
+  if (AV.error){
+    return '<div class="landing"><div class="error-box">'+esc(AV.error)+'</div><button class="big-btn gold" data-action="retryAnswerView">Try again</button></div>';
+  }
+  if (!AV.state){
+    return '<div class="landing"><p class="tag">Connecting to the host\u2026</p></div>' + (AV.connLost ? '<div class="error-box" style="max-width:400px;margin:0 auto;">Reconnecting\u2026</div>' : '');
+  }
+  var s = AV.state;
+  var body;
+  if (s.phase === 'playing'){
+    if (s.currentQuestion){
+      body = '<div class="av-label">Reading to '+esc(s.askedName||'')+'</div>' +
+        '<div class="av-question">'+esc(s.currentQuestion.q)+'</div>' +
+        '<div class="av-answer">'+esc(s.currentQuestion.a)+'</div>';
+    } else {
+      body = '<div class="av-label">On the spot</div><div class="av-turn">'+esc(s.askedName||'\u2014')+'</div>';
+    }
+    if (s.bankCallPending) body += '<div class="banner" style="margin-top:20px;">\uD83D\uDD14 '+esc(s.askedName||'')+' wants to bank!</div>';
+  } else if (s.phase === 'shootout' && s.shootout){
+    var sh = s.shootout;
+    var turnName = sh.order[sh.currentTurn] ? sh.order[sh.currentTurn].name : '';
+    if (sh.currentQuestion){
+      body = '<div class="av-label">'+(sh.sudden?'Sudden death \u2014 ':'')+'Reading to '+esc(turnName)+'</div>' +
+        '<div class="av-question">'+esc(sh.currentQuestion.q)+'</div>' +
+        '<div class="av-answer">'+esc(sh.currentQuestion.a)+'</div>';
+    } else {
+      body = '<div class="av-label">Up next</div><div class="av-turn">'+esc(turnName)+'</div>';
+    }
+  } else if (s.phase === 'voting'){
+    body = '<div class="av-label">Voting in progress</div><div class="av-turn">Who\'s the weakest link?</div>';
+  } else if (s.phase === 'elimination'){
+    body = '<div class="av-label">Voted off</div><div class="av-turn">'+esc(s.lastElimination?s.lastElimination.name:'')+'</div>';
+  } else if (s.phase === 'gameover'){
+    body = '<div class="av-label">Game over</div><div class="av-turn">\uD83C\uDFC6 '+esc(s.winner||'')+'</div>';
+  } else {
+    body = '<div class="av-label">Waiting for the game to start\u2026</div>';
+  }
+  return '<div class="av-wrap">' +
+    '<div style="position:absolute;top:16px;left:16px;color:var(--muted);font-size:12px;">ROOM '+esc(s.roomCode)+' \u00b7 Bank '+fmtMoney(s.bank)+'</div>' +
+    body +
   '</div>';
 }
 
@@ -1157,9 +1455,12 @@ function render(){
   if (role === null){
     if (localView === 'hostSetup') html = hostSetupView();
     else if (localView === 'playerSetup') html = playerSetupView();
+    else if (localView === 'answerViewSetup') html = answerViewSetupView();
     else html = landingView();
   } else if (role === 'host'){
     html = hostRootView();
+  } else if (role === 'answerView'){
+    html = answerViewRootView();
   } else {
     html = playerRootView();
   }
@@ -1195,7 +1496,33 @@ document.addEventListener('click', function(e){
   if (Actions[action]) Actions[action](arg, el);
 });
 
-render();
+/* Keyboard shortcuts for the host: C = correct, I = incorrect */
+document.addEventListener('keydown', function(e){
+  if (role !== 'host' || !H) return;
+  if (e.repeat) return; // ignore OS key-repeat while held, to avoid double-marking
+  var tag = (document.activeElement && document.activeElement.tagName) || '';
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+  var key = e.key ? e.key.toLowerCase() : '';
+  if (key !== 'c' && key !== 'i') return;
+  if (H.phase === 'playing' && H.currentQuestion){
+    e.preventDefault();
+    if (key === 'c') Actions.markCorrect(); else Actions.markIncorrect();
+  } else if (H.phase === 'shootout' && H.shootout && H.shootout.currentQuestion){
+    e.preventDefault();
+    Actions.shootoutMark(key === 'c' ? 'correct' : 'incorrect');
+  }
+});
+
+/* Auto-rejoin: if this tab already had a player session (e.g. the page was refreshed),
+   reconnect automatically instead of dropping back to the landing screen. */
+(function autoRejoin(){
+  var sess = getPlayerSession();
+  if (sess && sess.roomCode && sess.name){
+    connectPlayerToHost(sess.roomCode, sess.name);
+    return;
+  }
+  render();
+})();
 })();
 </script>
 </body>
