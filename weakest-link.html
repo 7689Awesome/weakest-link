@@ -1,0 +1,1056 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Chain Reaction — Weakest Link Party Game</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<style>
+:root{
+  --bg:#0a0e1a;
+  --panel:#121829;
+  --panel-2:#1a2138;
+  --line:#2a3350;
+  --gold:#e8b23d;
+  --gold-dim:#8a6a24;
+  --red:#e5484d;
+  --green:#3fa66c;
+  --text:#f1f3f6;
+  --muted:#8a93a6;
+  --blue:#4f8ff7;
+  --radius:14px;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  background:radial-gradient(ellipse at top, #131a30 0%, var(--bg) 55%);
+  color:var(--text);
+  font-family:'Inter',sans-serif;
+  min-height:100vh;
+  -webkit-tap-highlight-color:transparent;
+}
+h1,h2,h3,.display{font-family:'Oswald',sans-serif;}
+button{font-family:'Inter',sans-serif;cursor:pointer;border:none;}
+input,select{font-family:'Inter',sans-serif;}
+#app{min-height:100vh;display:flex;flex-direction:column;}
+
+/* ---------- Landing ---------- */
+.landing{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:32px;text-align:center;}
+.landing .brand{font-family:'Oswald',sans-serif;font-weight:600;font-size:clamp(40px,9vw,72px);letter-spacing:0.5px;margin:0;line-height:1;background:linear-gradient(180deg,#fff, var(--gold) 140%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;}
+.landing .brand span{color:var(--gold);-webkit-text-fill-color:var(--gold);}
+.landing .tag{color:var(--muted);font-size:16px;margin:10px 0 40px;max-width:420px;}
+.landing-btns{display:flex;gap:16px;flex-wrap:wrap;justify-content:center;}
+.big-btn{padding:18px 34px;border-radius:12px;font-size:17px;font-weight:600;min-width:200px;transition:transform .15s ease;}
+.big-btn:active{transform:scale(0.97);}
+.big-btn.gold{background:linear-gradient(180deg,#f3c463,var(--gold));color:#20150a;}
+.big-btn.ghost{background:var(--panel-2);color:var(--text);border:1px solid var(--line);}
+.setup-card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:28px;max-width:400px;width:100%;text-align:left;}
+.setup-card label{display:block;font-size:13px;color:var(--muted);margin:16px 0 6px;}
+.setup-card input,.setup-card select{width:100%;padding:12px 14px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--text);font-size:16px;}
+.setup-card input:focus,.setup-card select:focus{outline:2px solid var(--blue);}
+.back-link{background:none;color:var(--muted);font-size:14px;padding:6px 0;margin-bottom:10px;align-self:flex-start;}
+.error-box{background:rgba(229,72,77,0.12);border:1px solid var(--red);color:#ffb3b5;padding:14px 16px;border-radius:10px;margin:14px 0;font-size:14px;text-align:left;}
+
+/* ---------- Generic layout ---------- */
+.top-bar{display:flex;align-items:center;justify-content:space-between;padding:14px 22px;border-bottom:1px solid var(--line);flex-wrap:wrap;gap:10px;}
+.top-bar .room-pill{background:var(--panel-2);border:1px solid var(--gold-dim);color:var(--gold);font-family:'Oswald',sans-serif;font-size:15px;padding:6px 14px;border-radius:20px;letter-spacing:2px;}
+.stat-strip{display:flex;gap:10px;flex-wrap:wrap;}
+.stat-chip{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 14px;font-size:13px;color:var(--muted);}
+.stat-chip b{color:var(--text);font-family:'Oswald',sans-serif;font-size:16px;display:block;}
+.stat-chip.gold b{color:var(--gold);}
+.stat-chip.timer b{color:var(--blue);}
+.stat-chip.timer.low b{color:var(--red);}
+.main-grid{display:grid;grid-template-columns:220px 1fr 260px;gap:16px;padding:16px 22px;flex:1;}
+@media (max-width:980px){.main-grid{grid-template-columns:1fr;}}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:16px;}
+.panel h3{margin:0 0 12px;font-size:14px;font-weight:500;color:var(--muted);text-transform:none;letter-spacing:0.3px;}
+
+/* chain ladder */
+.ladder{display:flex;flex-direction:column-reverse;gap:4px;}
+.rung{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-radius:8px;background:var(--panel-2);color:var(--muted);font-family:'Oswald',sans-serif;font-size:15px;border-left:3px solid transparent;transition:.2s;}
+.rung.climbed{background:rgba(232,178,61,0.10);color:#e0c98a;border-left-color:var(--gold-dim);}
+.rung.current{background:linear-gradient(90deg,rgba(232,178,61,0.25),rgba(232,178,61,0.08));color:var(--gold);border-left-color:var(--gold);font-size:19px;font-weight:600;}
+.bank-total{margin-top:14px;text-align:center;padding:14px;border-radius:10px;background:var(--panel-2);}
+.bank-total .amt{font-family:'Oswald',sans-serif;font-size:30px;color:var(--gold);}
+.bank-total .lbl{font-size:12px;color:var(--muted);}
+
+/* stage */
+.stage{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;min-height:260px;}
+.stage .q-label{font-size:13px;color:var(--muted);margin-bottom:10px;}
+.stage .q-text{font-size:clamp(20px,3vw,30px);font-weight:600;line-height:1.3;max-width:560px;}
+.stage .a-text{margin-top:18px;font-family:'Oswald',sans-serif;font-size:22px;color:var(--green);}
+.stage .asked-who{font-size:15px;color:var(--blue);margin-top:10px;}
+.action-row{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:22px;}
+.act-btn{padding:16px 26px;border-radius:10px;font-size:16px;font-weight:600;}
+.act-btn.correct{background:var(--green);color:#06210f;}
+.act-btn.incorrect{background:var(--red);color:#2a0709;}
+.act-btn.primary{background:var(--blue);color:#06122a;}
+.act-btn.bank{background:linear-gradient(180deg,#f3c463,var(--gold));color:#20150a;}
+.act-btn.neutral{background:var(--panel-2);color:var(--text);border:1px solid var(--line);}
+.act-btn:disabled{opacity:0.35;cursor:not-allowed;}
+
+/* roster */
+.roster{display:flex;flex-direction:column;gap:8px;}
+.chip{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-radius:10px;background:var(--panel-2);border:1px solid transparent;font-size:14px;}
+.chip.selected{border-color:var(--blue);background:rgba(79,143,247,0.12);}
+.chip.dead{opacity:0.4;text-decoration:line-through;}
+.chip .nm{font-weight:600;}
+.chip .sub{font-size:11px;color:var(--muted);}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--green);display:inline-block;margin-right:6px;}
+.dot.off{background:var(--muted);}
+
+.log{margin-top:14px;font-size:12px;color:var(--muted);display:flex;flex-direction:column;gap:6px;max-height:140px;overflow-y:auto;}
+.banner{background:rgba(232,178,61,0.15);border:1px solid var(--gold-dim);color:var(--gold);padding:10px 14px;border-radius:10px;font-size:14px;margin-bottom:12px;text-align:center;}
+
+/* voting */
+.vote-grid{display:flex;flex-direction:column;gap:8px;max-width:420px;margin:0 auto;}
+.vote-row{display:flex;justify-content:space-between;align-items:center;background:var(--panel-2);padding:10px 14px;border-radius:10px;font-size:14px;}
+.vote-row .yes{color:var(--green);}
+.vote-row .no{color:var(--muted);}
+
+/* elimination */
+.elim-card{text-align:center;padding:30px;}
+.elim-card .name{font-family:'Oswald',sans-serif;font-size:38px;color:var(--red);margin:10px 0;}
+.tally{display:flex;flex-direction:column;gap:6px;max-width:340px;margin:18px auto;}
+.tally .r{display:flex;justify-content:space-between;background:var(--panel-2);padding:8px 12px;border-radius:8px;font-size:14px;}
+
+/* shootout */
+.duel{display:flex;justify-content:center;gap:40px;flex-wrap:wrap;margin:20px 0;}
+.duel-side{text-align:center;}
+.duel-side .nm{font-family:'Oswald',sans-serif;font-size:22px;}
+.duel-side.active .nm{color:var(--gold);}
+.kicks{display:flex;gap:6px;justify-content:center;margin-top:10px;}
+.kick{width:26px;height:26px;border-radius:50%;background:var(--panel-2);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:14px;}
+.kick.hit{background:var(--green);color:#06210f;border-color:var(--green);}
+.kick.miss{background:var(--red);color:#2a0709;border-color:var(--red);}
+
+/* game over */
+.gameover{text-align:center;padding:40px 20px;}
+.gameover .trophy{font-size:64px;}
+.gameover .winner{font-family:'Oswald',sans-serif;font-size:44px;color:var(--gold);margin:6px 0 24px;}
+.standings{max-width:360px;margin:0 auto;display:flex;flex-direction:column;gap:6px;}
+.standings .r{display:flex;justify-content:space-between;background:var(--panel-2);padding:9px 14px;border-radius:8px;font-size:14px;}
+
+/* player screen */
+.player-wrap{max-width:520px;margin:0 auto;width:100%;padding:16px;}
+.p-header{text-align:center;margin-bottom:14px;}
+.p-header .rc{color:var(--gold);font-family:'Oswald',sans-serif;letter-spacing:3px;font-size:14px;}
+.p-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px;}
+.p-stat{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px;text-align:center;}
+.p-stat b{display:block;font-family:'Oswald',sans-serif;font-size:22px;}
+.p-stat span{font-size:11px;color:var(--muted);}
+.turn-flag{text-align:center;padding:16px;border-radius:12px;font-size:17px;font-weight:700;margin-bottom:14px;}
+.turn-flag.yours{background:rgba(232,178,61,0.18);color:var(--gold);border:1px solid var(--gold-dim);}
+.turn-flag.theirs{background:var(--panel-2);color:var(--muted);border:1px solid var(--line);}
+.center-msg{text-align:center;color:var(--muted);padding:40px 20px;font-size:15px;}
+.spectator-tag{background:var(--panel-2);color:var(--muted);text-align:center;padding:10px;border-radius:10px;margin-bottom:14px;font-size:13px;}
+.full-btn{width:100%;padding:16px;border-radius:12px;font-size:16px;font-weight:600;margin-top:10px;}
+.timer-ring{width:90px;height:90px;border-radius:50%;border:6px solid var(--panel-2);display:flex;align-items:center;justify-content:center;margin:0 auto 14px;font-family:'Oswald',sans-serif;font-size:26px;border-top-color:var(--blue);}
+.timer-ring.low{border-top-color:var(--red);color:var(--red);}
+select.vote-select{width:100%;padding:14px;border-radius:10px;background:var(--panel-2);color:var(--text);border:1px solid var(--line);font-size:16px;margin-bottom:12px;}
+.footer-note{text-align:center;color:var(--muted);font-size:11px;padding:14px;}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+(function(){
+'use strict';
+
+/* ============================== DATA ============================== */
+var CHAIN_VALUES = [20,50,100,150,200,300,400,500,600,700,800,900,1000];
+
+var QUESTIONS = [
+["What planet is known as the Red Planet?","Mars"],
+["What is the capital of Japan?","Tokyo"],
+["How many strings does a standard violin have?","Four"],
+["What ocean lies between Africa and the Americas?","The Atlantic Ocean"],
+["What gas do plants absorb from the atmosphere for photosynthesis?","Carbon dioxide"],
+["Who painted the Mona Lisa?","Leonardo da Vinci"],
+["What is the largest land animal on Earth?","The African elephant"],
+["In which country would you find the Great Barrier Reef?","Australia"],
+["What is the chemical symbol for gold?","Au"],
+["How many players are on a standard soccer team on the field?","Eleven"],
+["What is the tallest mountain in the world?","Mount Everest"],
+["What language has the most native speakers worldwide?","Mandarin Chinese"],
+["What year did the Titanic sink?","1912"],
+["What is the smallest prime number?","Two"],
+["Which organ pumps blood through the human body?","The heart"],
+["What is the currency of the United Kingdom?","The pound sterling"],
+["Who wrote the play Romeo and Juliet?","William Shakespeare"],
+["What is the freezing point of water in Celsius?","Zero degrees"],
+["What is the largest desert in the world?","The Sahara (or Antarctic Desert, if counting cold deserts)"],
+["Which planet has the most moons in our solar system?","Saturn"],
+["What is the capital city of Canada?","Ottawa"],
+["What metal is liquid at room temperature?","Mercury"],
+["How many continents are there?","Seven"],
+["What is the main ingredient in guacamole?","Avocado"],
+["What instrument has 88 keys?","The piano"],
+["Which country invented pizza as we know it?","Italy"],
+["What is the longest river in the world?","The Nile"],
+["What do bees collect and use to make honey?","Nectar"],
+["What is the study of earthquakes called?","Seismology"],
+["Which country gifted the Statue of Liberty to the United States?","France"],
+["What is the hardest natural substance on Earth?","Diamond"],
+["How many bones are in the adult human body?","206"],
+["What is the capital of Egypt?","Cairo"],
+["What sport is known as 'the beautiful game'?","Football (soccer)"],
+["What is the largest planet in our solar system?","Jupiter"],
+["What year did World War II end?","1945"],
+["What is the main gas found in the air we breathe?","Nitrogen"],
+["Which animal is known as the King of the Jungle?","The lion"],
+["What is the capital of Australia?","Canberra"],
+["How many colors are in a rainbow?","Seven"],
+["What is the tallest living land animal?","The giraffe"],
+["What is the world's most spoken second language?","English"],
+["What is the chemical symbol for water?","H2O"],
+["Which country is home to the kangaroo in the wild?","Australia"],
+["What is the largest ocean on Earth?","The Pacific Ocean"],
+["Who developed the theory of relativity?","Albert Einstein"],
+["What is the smallest country in the world?","Vatican City"],
+["What natural satellite orbits the Earth?","The Moon"],
+["What is the fastest land animal?","The cheetah"],
+["What shape has three sides?","A triangle"]
+];
+
+/* ============================== HELPERS ============================== */
+function $(sel){ return document.querySelector(sel); }
+function uid(){ return Math.random().toString(36).slice(2,9); }
+function fmtMoney(n){ return '$' + n.toLocaleString(); }
+function shuffle(arr){
+  for (var i = arr.length - 1; i > 0; i--){
+    var j = Math.floor(Math.random() * (i + 1));
+    var t = arr[i]; arr[i] = arr[j]; arr[j] = t;
+  }
+  return arr;
+}
+function genRoomCode(){
+  var chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+  var s = '';
+  for (var i = 0; i < 4; i++) s += chars[Math.floor(Math.random() * chars.length)];
+  return s;
+}
+function accuracyOf(p){
+  var total = p.correct + p.incorrect;
+  if (total === 0) return null;
+  return Math.round((p.correct / total) * 100);
+}
+function esc(s){
+  return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+  });
+}
+function fmtClock(ms){
+  var s = Math.max(0, Math.ceil(ms/1000));
+  var m = Math.floor(s/60);
+  var r = s%60;
+  return m + ':' + (r<10?'0':'') + r;
+}
+
+/* ============================== GLOBAL STATE ============================== */
+var role = null;          // null | 'host' | 'player'
+var localView = 'landing'; // 'landing' | 'hostSetup' | 'playerSetup'
+var peer = null;
+
+var H = null;              // host authoritative state
+var hostConns = {};        // playerId -> DataConnection
+
+var P = {                  // player-side local wrapper
+  conn: null, roomCode: '', myName: '', myId: null,
+  state: null, error: null, denied: null, connLost: false,
+  localVoted: false, bankFlash: false
+};
+
+/* ============================== HOST STATE ============================== */
+function newHostState(){
+  return {
+    ready:false, error:null,
+    phase:'lobby', roomCode:'', roundDuration:60,
+    players:[], chainIndex:-1, bank:0, round:1,
+    currentAskedId:null, currentQuestion:null,
+    timer:{endsAt:0,duration:60,running:false},
+    votes:{}, lastElimination:null, tieCandidates:null, tieTally:null,
+    bankCallPending:false, shootout:null, winner:null,
+    log:[], _deck:[]
+  };
+}
+function pushLog(msg){
+  H.log.unshift({t:Date.now(), msg:msg});
+  H.log = H.log.slice(0,8);
+}
+function pullQuestion(){
+  if (!H._deck || H._deck.length === 0){
+    H._deck = shuffle(QUESTIONS.slice());
+  }
+  return H._deck.pop();
+}
+
+/* ============================== HOST NETWORKING ============================== */
+function hostCreateRoom(durationSeconds){
+  role = 'host';
+  H = newHostState();
+  H.roundDuration = durationSeconds;
+  H.timer.duration = durationSeconds;
+  H.roomCode = genRoomCode();
+  try{
+    peer = new Peer('wlink-' + H.roomCode, {debug:0});
+  } catch(e){
+    H.error = 'Could not start a connection. Try again.';
+    render();
+    return;
+  }
+  peer.on('open', function(){ H.ready = true; render(); });
+  peer.on('connection', function(conn){
+    conn.on('data', function(data){ handlePlayerMessage(conn, data); });
+    conn.on('close', function(){ markPlayerDisconnected(conn); });
+  });
+  peer.on('error', function(err){
+    H.error = (err && err.type === 'unavailable-id')
+      ? 'That room code is already in use — try again.'
+      : 'Connection error (' + (err && err.type) + '). Check your internet and try again.';
+    render();
+  });
+  render();
+}
+
+function handlePlayerMessage(conn, msg){
+  if (!H) return;
+  if (msg.type === 'join'){
+    var p = null;
+    if (msg.rejoinId){
+      p = H.players.filter(function(pl){ return pl.id === msg.rejoinId; })[0];
+    }
+    if (!p && H.phase === 'lobby'){
+      var name = (msg.name || 'Player').slice(0,18);
+      var finalName = name, n = 2;
+      while (H.players.some(function(pl){ return pl.name.toLowerCase() === finalName.toLowerCase(); })){
+        finalName = name + ' ' + n; n++;
+      }
+      p = {id:uid(), name:finalName, alive:true, correct:0, incorrect:0, connected:true};
+      H.players.push(p);
+    } else if (p){
+      p.connected = true;
+    } else {
+      conn.send({type:'denied', reason:'The game is already in progress. Ask the host to start a new room.'});
+      return;
+    }
+    hostConns[p.id] = conn;
+    conn.send({type:'welcome', playerId:p.id, roomCode:H.roomCode});
+    pushLog(p.name + ' joined');
+    broadcastState(); render();
+    return;
+  }
+  var player = null;
+  for (var pid in hostConns){ if (hostConns[pid] === conn) player = H.players.filter(function(pl){return pl.id===pid;})[0]; }
+  if (!player) return;
+  if (msg.type === 'vote'){
+    if (H.phase !== 'voting' || !player.alive) return;
+    H.votes[player.id] = msg.targetId;
+    broadcastState(); render();
+  } else if (msg.type === 'callBank'){
+    if (H.phase === 'playing' && H.currentAskedId === player.id){
+      H.bankCallPending = true;
+      pushLog('\uD83D\uDD14 ' + player.name + ' wants to bank!');
+      render();
+    }
+  }
+}
+
+function markPlayerDisconnected(conn){
+  var player = null;
+  for (var pid in hostConns){ if (hostConns[pid] === conn) player = H.players.filter(function(pl){return pl.id===pid;})[0]; }
+  if (player){ player.connected = false; pushLog(player.name + ' disconnected'); broadcastState(); render(); }
+}
+
+function sanitizeShootout(s){
+  return {
+    order: s.order.map(function(id){ return {id:id, name:(H.players.filter(function(p){return p.id===id;})[0]||{}).name}; }),
+    rounds: s.rounds, currentRoundIndex: s.currentRoundIndex, currentTurn: s.currentTurn,
+    sudden: s.sudden, winnerId: s.winnerId
+  };
+}
+function sanitizeForPlayer(forPlayer){
+  return {
+    phase: H.phase, roomCode: H.roomCode,
+    players: H.players.map(function(p){ return {id:p.id,name:p.name,alive:p.alive,correct:p.correct,incorrect:p.incorrect,connected:p.connected}; }),
+    chainIndex: H.chainIndex,
+    chainValue: H.chainIndex >= 0 ? CHAIN_VALUES[H.chainIndex] : 0,
+    bank: H.bank, round: H.round,
+    currentAskedId: H.currentAskedId,
+    currentQuestion: H.currentQuestion ? {q:H.currentQuestion[0]} : null,
+    timer: H.timer,
+    myId: forPlayer.id,
+    votedAlready: !!H.votes[forPlayer.id],
+    lastElimination: H.lastElimination,
+    shootout: H.shootout ? sanitizeShootout(H.shootout) : null,
+    winner: H.winner || null
+  };
+}
+function broadcastState(){
+  H.players.forEach(function(p){
+    var conn = hostConns[p.id];
+    if (!conn || !conn.open) return;
+    conn.send({type:'state', state: sanitizeForPlayer(p)});
+  });
+}
+
+/* ============================== HOST GAME ACTIONS ============================== */
+var Actions = {};
+
+Actions.goHostSetup = function(){ localView = 'hostSetup'; render(); };
+Actions.goPlayerSetup = function(){ localView = 'playerSetup'; render(); };
+Actions.goBack = function(){ localView = 'landing'; render(); };
+
+Actions.createRoom = function(){
+  var dur = parseInt(($('#roundDuration')||{}).value, 10) || 60;
+  hostCreateRoom(dur);
+};
+Actions.retryHost = function(){
+  var dur = (H && H.roundDuration) || 60;
+  hostCreateRoom(dur);
+};
+
+Actions.startGame = function(){
+  if (H.players.length < 3){ alert('You need at least 3 players to start.'); return; }
+  H.phase = 'playing'; H.round = 1; H.chainIndex = -1;
+  H.currentAskedId = H.players[0].id;
+  startTimer();
+  pushLog('Game started with ' + H.players.length + ' players');
+  broadcastState(); render();
+};
+
+Actions.selectAsked = function(playerId){
+  if (H.phase !== 'playing') return;
+  var p = H.players.filter(function(pl){return pl.id===playerId && pl.alive;})[0];
+  if (!p) return;
+  H.currentAskedId = playerId;
+  H.bankCallPending = false;
+  broadcastState(); render();
+};
+
+Actions.nextQuestion = function(){
+  if (H.phase !== 'playing' || !H.currentAskedId) return;
+  H.currentQuestion = pullQuestion();
+  H.bankCallPending = false;
+  broadcastState(); render();
+};
+
+function advanceTurn(){
+  var alive = H.players.filter(function(p){return p.alive;});
+  var idx = alive.findIndex(function(p){return p.id===H.currentAskedId;});
+  H.currentAskedId = alive[(idx+1) % alive.length].id;
+}
+
+Actions.markCorrect = function(){
+  if (!H.currentQuestion || !H.currentAskedId) return;
+  var p = H.players.filter(function(pl){return pl.id===H.currentAskedId;})[0];
+  p.correct++;
+  H.chainIndex = Math.min(H.chainIndex+1, CHAIN_VALUES.length-1);
+  H.currentQuestion = null;
+  pushLog('\u2705 ' + p.name + ' correct \u2014 chain at ' + fmtMoney(CHAIN_VALUES[H.chainIndex]));
+  advanceTurn();
+  broadcastState(); render();
+};
+Actions.markIncorrect = function(){
+  if (!H.currentQuestion || !H.currentAskedId) return;
+  var p = H.players.filter(function(pl){return pl.id===H.currentAskedId;})[0];
+  p.incorrect++;
+  pushLog('\u274C ' + p.name + ' incorrect \u2014 chain reset');
+  H.chainIndex = -1;
+  H.currentQuestion = null;
+  advanceTurn();
+  broadcastState(); render();
+};
+
+Actions.bankChain = function(){
+  if (H.phase !== 'playing' || H.chainIndex < 0) return;
+  var amt = CHAIN_VALUES[H.chainIndex];
+  H.bank += amt;
+  pushLog('\uD83C\uDFE6 Banked ' + fmtMoney(amt) + ' \u2014 total bank ' + fmtMoney(H.bank));
+  H.chainIndex = -1;
+  H.bankCallPending = false;
+  broadcastState(); render();
+};
+
+function startTimer(){
+  H.timer = {duration:H.roundDuration, endsAt: Date.now() + H.roundDuration*1000, running:true};
+}
+Actions.endRound = function(){
+  if (H.phase !== 'playing') return;
+  H.phase = 'voting'; H.votes = {}; H.currentQuestion = null;
+  H.timer.running = false;
+  pushLog('Round ' + H.round + ' ended \u2014 time to vote');
+  broadcastState(); render();
+};
+
+setInterval(function(){
+  if (H && H.phase === 'playing' && H.timer.running && Date.now() >= H.timer.endsAt){
+    Actions.endRound();
+  }
+}, 500);
+setInterval(function(){
+  if (role === 'host' && H && (H.phase === 'playing')) render();
+  if (role === 'player' && P.state && P.state.phase === 'playing') render();
+}, 1000);
+
+Actions.forceRevealVotes = function(){ resolveVotes(); };
+
+function resolveVotes(){
+  var alive = H.players.filter(function(p){return p.alive;});
+  var tally = {};
+  alive.forEach(function(p){ tally[p.id] = 0; });
+  for (var voter in H.votes){
+    var target = H.votes[voter];
+    if (tally[target] !== undefined) tally[target]++;
+  }
+  var maxVotes = Math.max.apply(null, alive.map(function(p){return tally[p.id];}));
+  var top = alive.filter(function(p){ return tally[p.id] === maxVotes; });
+  if (top.length === 1){
+    finalizeElimination(top[0], tally, '');
+    return;
+  }
+  var scored = top.map(function(p){ return {p:p, score:p.correct - p.incorrect}; });
+  var minScore = Math.min.apply(null, scored.map(function(s){return s.score;}));
+  var stillTied = scored.filter(function(s){return s.score===minScore;}).map(function(s){return s.p;});
+  if (stillTied.length === 1){
+    finalizeElimination(stillTied[0], tally, 'Tie broken by in-game performance.');
+    return;
+  }
+  H.tieCandidates = stillTied.map(function(p){return p.id;});
+  H.tieTally = tally;
+  broadcastState(); render();
+}
+Actions.manualTieBreak = function(playerId){
+  var p = H.players.filter(function(pl){return pl.id===playerId;})[0];
+  finalizeElimination(p, H.tieTally, 'The host broke the tie.');
+};
+function finalizeElimination(eliminated, tally, note){
+  eliminated.alive = false;
+  H.lastElimination = {
+    name: eliminated.name,
+    tally: H.players.filter(function(p){return tally[p.id]!==undefined;})
+      .map(function(p){return {name:p.name, votes:tally[p.id]};})
+      .sort(function(a,b){return b.votes-a.votes;}),
+    note: note
+  };
+  H.tieCandidates = null; H.tieTally = null;
+  H.phase = 'elimination';
+  pushLog('\uD83D\uDEAA ' + eliminated.name + ' voted off as the Weakest Link');
+  broadcastState(); render();
+}
+
+Actions.continueAfterElimination = function(){
+  var alive = H.players.filter(function(p){return p.alive;});
+  if (alive.length === 2){
+    H.phase = 'shootout';
+    H.shootout = {order:[alive[0].id, alive[1].id], rounds:[], currentRoundIndex:0, currentTurn:0, currentQuestion:null, sudden:false, winnerId:null};
+    pushLog('Final 2! Penalty shootout begins');
+  } else {
+    H.phase = 'playing'; H.round++; H.chainIndex = -1;
+    H.currentAskedId = alive[0].id; H.currentQuestion = null;
+    startTimer();
+  }
+  broadcastState(); render();
+};
+
+/* ---- shootout ---- */
+function scoreOf(s, idx){
+  return s.rounds.reduce(function(sum,r){ return sum + ((r['p'+idx]==='correct')?1:0); }, 0);
+}
+Actions.shootoutNextQuestion = function(){
+  var s = H.shootout;
+  if (!s || s.winnerId) return;
+  s.currentQuestion = pullQuestion();
+  broadcastState(); render();
+};
+Actions.shootoutMark = function(result){
+  var s = H.shootout;
+  if (!s || !s.currentQuestion) return;
+  var turnPid = s.order[s.currentTurn];
+  var p = H.players.filter(function(pl){return pl.id===turnPid;})[0];
+  if (!s.rounds[s.currentRoundIndex]) s.rounds[s.currentRoundIndex] = {p0:null,p1:null};
+  s.rounds[s.currentRoundIndex]['p'+s.currentTurn] = result;
+  if (result === 'correct') p.correct++; else p.incorrect++;
+  s.currentQuestion = null;
+  pushLog(p.name + ': ' + (result==='correct' ? '\u2705' : '\u274C') + ' in the shootout');
+
+  checkShootoutEnd();
+  if (!s.winnerId){
+    if (s.currentTurn === 0){ s.currentTurn = 1; }
+    else { s.currentTurn = 0; s.currentRoundIndex++; }
+  }
+  broadcastState(); render();
+};
+function checkShootoutEnd(){
+  var s = H.shootout;
+  var REG = 5;
+  var r = s.rounds[s.currentRoundIndex];
+  if (!r || r.p0 == null || r.p1 == null) return;
+  if (!s.sudden){
+    var sc0 = scoreOf(s,0), sc1 = scoreOf(s,1);
+    var wavesDone = s.currentRoundIndex + 1;
+    var remain0 = REG - wavesDone, remain1 = REG - wavesDone;
+    if (wavesDone >= REG){
+      if (sc0 !== sc1){ declareShootoutWinner(sc0>sc1?0:1); return; }
+      s.sudden = true; return;
+    }
+    if (sc0 > sc1 + remain1){ declareShootoutWinner(0); return; }
+    if (sc1 > sc0 + remain0){ declareShootoutWinner(1); return; }
+  } else {
+    var w0 = r.p0 === 'correct', w1 = r.p1 === 'correct';
+    if (w0 && !w1){ declareShootoutWinner(0); return; }
+    if (w1 && !w0){ declareShootoutWinner(1); return; }
+  }
+}
+function declareShootoutWinner(idx){
+  var s = H.shootout;
+  s.winnerId = s.order[idx];
+  var winner = H.players.filter(function(p){return p.id===s.winnerId;})[0];
+  H.phase = 'gameover';
+  H.winner = winner.name;
+  pushLog('\uD83C\uDFC6 ' + winner.name + ' wins the game!');
+}
+
+Actions.playAgain = function(){
+  var oldPlayers = H.players.map(function(p){ return {id:p.id,name:p.name,alive:true,correct:0,incorrect:0,connected:p.connected}; });
+  var dur = H.roundDuration, code = H.roomCode, ready = H.ready;
+  H = newHostState();
+  H.roundDuration = dur; H.roomCode = code; H.ready = ready; H.players = oldPlayers;
+  broadcastState(); render();
+};
+
+/* ============================== PLAYER NETWORKING ============================== */
+Actions.joinRoom = function(){
+  var name = (($('#playerName')||{}).value || '').trim();
+  var code = (($('#roomCodeInput')||{}).value || '').trim().toUpperCase();
+  if (!name || !code){ alert('Enter your name and the room code.'); return; }
+  role = 'player';
+  P.roomCode = code; P.myName = name;
+  try{
+    peer = new Peer(undefined, {debug:0});
+  } catch(e){
+    P.error = 'Could not start a connection. Try again.';
+    render(); return;
+  }
+  peer.on('open', function(){
+    var conn = peer.connect('wlink-' + code, {reliable:true});
+    P.conn = conn;
+    conn.on('open', function(){
+      conn.send({type:'join', name:name, rejoinId: localStorage.getItem('wlink_' + code)});
+    });
+    conn.on('data', function(d){ handleHostMessage(d); });
+    conn.on('close', function(){ P.connLost = true; render(); });
+    render();
+  });
+  peer.on('error', function(err){
+    P.error = (err && err.type === 'peer-unavailable')
+      ? 'Room not found. Double-check the code with your host.'
+      : 'Connection error (' + (err && err.type) + '). Check your internet and try again.';
+    render();
+  });
+  render();
+};
+Actions.retryJoin = function(){ localView = 'playerSetup'; role = null; P = {conn:null,roomCode:'',myName:'',myId:null,state:null,error:null,denied:null,connLost:false,localVoted:false,bankFlash:false}; render(); };
+
+function handleHostMessage(msg){
+  if (msg.type === 'welcome'){
+    P.myId = msg.playerId;
+    localStorage.setItem('wlink_' + P.roomCode, msg.playerId);
+    P.denied = null;
+    render();
+  } else if (msg.type === 'state'){
+    P.state = msg.state;
+    P.connLost = false;
+    render();
+  } else if (msg.type === 'denied'){
+    P.denied = msg.reason;
+    render();
+  }
+}
+Actions.submitVote = function(){
+  var sel = $('#voteSelect');
+  if (!sel || !sel.value) return;
+  P.conn.send({type:'vote', targetId: sel.value});
+  P.localVoted = true;
+  render();
+};
+Actions.callBank = function(){
+  P.conn.send({type:'callBank'});
+  P.bankFlash = true;
+  render();
+  setTimeout(function(){ P.bankFlash = false; render(); }, 2500);
+};
+
+/* ============================== VIEWS: LANDING / SETUP ============================== */
+function landingView(){
+  return '' +
+  '<div class="landing">' +
+    '<h1 class="brand">CHAIN <span>REACTION</span></h1>' +
+    '<p class="tag">A live trivia elimination game. Host it on the big screen, everyone else plays from their phone.</p>' +
+    '<div class="landing-btns">' +
+      '<button class="big-btn gold" data-action="goHostSetup">Host a game</button>' +
+      '<button class="big-btn ghost" data-action="goPlayerSetup">Join a game</button>' +
+    '</div>' +
+  '</div>';
+}
+function hostSetupView(){
+  return '' +
+  '<div class="landing">' +
+    '<div class="setup-card">' +
+      '<button class="back-link" data-action="goBack">\u2190 Back</button>' +
+      '<h2 style="margin:0;">Host a game</h2>' +
+      '<label for="roundDuration">Seconds per round</label>' +
+      '<select id="roundDuration">' +
+        '<option value="45">45 seconds</option>' +
+        '<option value="60" selected>60 seconds</option>' +
+        '<option value="90">90 seconds</option>' +
+        '<option value="120">120 seconds</option>' +
+      '</select>' +
+      '<button class="big-btn gold full-btn" data-action="createRoom">Create room</button>' +
+    '</div>' +
+  '</div>';
+}
+function playerSetupView(){
+  return '' +
+  '<div class="landing">' +
+    '<div class="setup-card">' +
+      '<button class="back-link" data-action="goBack">\u2190 Back</button>' +
+      '<h2 style="margin:0;">Join a game</h2>' +
+      '<label for="playerName">Your name</label>' +
+      '<input id="playerName" maxlength="18" placeholder="e.g. Sam" autocomplete="off">' +
+      '<label for="roomCodeInput">Room code</label>' +
+      '<input id="roomCodeInput" maxlength="4" placeholder="e.g. QWXK" autocomplete="off" style="text-transform:uppercase;letter-spacing:3px;">' +
+      '<button class="big-btn gold full-btn" data-action="joinRoom">Join room</button>' +
+    '</div>' +
+  '</div>';
+}
+
+/* ============================== VIEWS: HOST ============================== */
+function ladderHtml(chainIndex){
+  return '<div class="ladder">' + CHAIN_VALUES.map(function(v,i){
+    var cls = i===chainIndex ? 'rung current' : (i<chainIndex ? 'rung climbed' : 'rung');
+    return '<div class="'+cls+'">'+fmtMoney(v)+'</div>';
+  }).join('') + '</div>';
+}
+function rosterHtml(players, currentAskedId, selectable){
+  return '<div class="roster">' + players.map(function(p){
+    var cls = 'chip' + (p.id===currentAskedId?' selected':'') + (!p.alive?' dead':'');
+    var acc = accuracyOf(p);
+    var action = (selectable && p.alive) ? ' data-action="selectAsked" data-arg="'+p.id+'"' : '';
+    return '<div class="'+cls+'" style="'+(selectable&&p.alive?'cursor:pointer;':'')+'"'+action+'>' +
+      '<div><span class="dot'+(p.connected?'':' off')+'"></span><span class="nm">'+esc(p.name)+'</span>' +
+      '<div class="sub">'+p.correct+'\u2713 / '+p.incorrect+'\u2717'+(acc!==null?' \u00b7 '+acc+'%':'')+'</div></div>' +
+    '</div>';
+  }).join('') + '</div>';
+}
+
+function hostRootView(){
+  if (H.error){
+    return '<div class="landing"><div class="error-box">'+esc(H.error)+'</div><button class="big-btn gold" data-action="retryHost">Try again</button></div>';
+  }
+  if (!H.ready){
+    return '<div class="landing"><p class="tag">Setting up your room\u2026</p></div>';
+  }
+  if (H.phase === 'lobby') return hostLobbyView();
+  if (H.phase === 'playing') return hostPlayingView();
+  if (H.phase === 'voting') return hostVotingView();
+  if (H.phase === 'elimination') return hostEliminationView();
+  if (H.phase === 'shootout') return hostShootoutView();
+  if (H.phase === 'gameover') return hostGameOverView();
+  return '<div class="center-msg">Unknown phase.</div>';
+}
+
+function topBarHtml(extraChips){
+  var chips = '<span class="stat-chip gold"><b>'+fmtMoney(H.bank)+'</b>Bank</span>';
+  if (H.phase === 'playing'){
+    var remain = H.timer.running ? fmtClock(H.timer.endsAt - Date.now()) : '--:--';
+    var low = H.timer.running && (H.timer.endsAt - Date.now()) < 10000;
+    chips += '<span class="stat-chip timer'+(low?' low':'')+'"><b>'+remain+'</b>Time left</span>';
+    chips += '<span class="stat-chip"><b>'+H.round+'</b>Round</span>';
+  }
+  return '<div class="top-bar"><div class="room-pill">ROOM '+esc(H.roomCode)+'</div><div class="stat-strip">'+chips+(extraChips||'')+'</div></div>';
+}
+
+function hostLobbyView(){
+  var list = H.players.length ? H.players.map(function(p){
+    return '<div class="chip"><span><span class="dot"></span>'+esc(p.name)+'</span></div>';
+  }).join('') : '<p class="center-msg" style="padding:10px;">Waiting for players to join\u2026</p>';
+  return '' +
+  '<div class="top-bar"><div class="room-pill">ROOM '+esc(H.roomCode)+'</div><div class="stat-strip"><span class="stat-chip"><b>'+H.players.length+'</b>Joined</span></div></div>' +
+  '<div style="padding:24px 22px;max-width:640px;margin:0 auto;width:100%;text-align:center;">' +
+    '<p style="color:var(--muted);">Have everyone go to this page and tap <b style="color:var(--text);">Join a game</b>, then enter this code:</p>' +
+    '<h1 class="display" style="font-size:64px;letter-spacing:10px;color:var(--gold);margin:6px 0 24px;">'+esc(H.roomCode)+'</h1>' +
+    '<div class="panel" style="text-align:left;"><h3>Players</h3><div class="roster">'+list+'</div></div>' +
+    '<button class="big-btn gold full-btn" data-action="startGame" style="max-width:320px;">Start game ('+H.players.length+' joined, need 3+)</button>' +
+  '</div>';
+}
+
+function hostPlayingView(){
+  var askedPlayer = H.players.filter(function(p){return p.id===H.currentAskedId;})[0];
+  var stage;
+  if (H.currentQuestion){
+    stage = '<div class="stage">' +
+      '<div class="q-label">Reading to '+esc(askedPlayer?askedPlayer.name:'')+'</div>' +
+      '<div class="q-text">'+esc(H.currentQuestion[0])+'</div>' +
+      '<div class="a-text">Answer: '+esc(H.currentQuestion[1])+'</div>' +
+      '<div class="action-row">' +
+        '<button class="act-btn correct" data-action="markCorrect">Correct</button>' +
+        '<button class="act-btn incorrect" data-action="markIncorrect">Incorrect</button>' +
+      '</div>' +
+    '</div>';
+  } else {
+    stage = '<div class="stage">' +
+      (H.bankCallPending ? '<div class="banner">\uD83D\uDD14 '+esc(askedPlayer?askedPlayer.name:'')+' wants to bank the chain!</div>' : '') +
+      '<div class="q-label">On the spot</div>' +
+      '<div class="q-text" style="color:var(--blue);">'+esc(askedPlayer?askedPlayer.name:'\u2014')+'</div>' +
+      '<div class="action-row">' +
+        '<button class="act-btn primary" data-action="nextQuestion">Ask next question</button>' +
+        '<button class="act-btn bank" data-action="bankChain" '+(H.chainIndex<0?'disabled':'')+'>Bank '+(H.chainIndex>=0?fmtMoney(CHAIN_VALUES[H.chainIndex]):'')+'</button>' +
+      '</div>' +
+    '</div>';
+  }
+  var logHtml = '<div class="log">' + H.log.map(function(l){ return '<div>'+esc(l.msg)+'</div>'; }).join('') + '</div>';
+  return '' +
+    topBarHtml() +
+    '<div class="main-grid">' +
+      '<div class="panel"><h3>Chain</h3>'+ladderHtml(H.chainIndex)+
+        '<div class="bank-total"><div class="amt">'+fmtMoney(H.bank)+'</div><div class="lbl">Team bank</div></div></div>' +
+      '<div class="panel">'+stage+'<div class="action-row"><button class="act-btn neutral" data-action="endRound">End round now</button></div>'+logHtml+'</div>' +
+      '<div class="panel"><h3>Players \u2014 tap to choose who\'s asked</h3>'+rosterHtml(H.players, H.currentAskedId, true)+'</div>' +
+    '</div>';
+}
+
+function hostVotingView(){
+  var alive = H.players.filter(function(p){return p.alive;});
+  var votedCount = Object.keys(H.votes).length;
+  if (H.tieCandidates){
+    var cands = H.players.filter(function(p){return H.tieCandidates.indexOf(p.id)>=0;});
+    return topBarHtml() + '<div style="padding:24px 22px;max-width:520px;margin:0 auto;text-align:center;">' +
+      '<h2>It\'s a tie</h2><p class="tag">Performance stats didn\'t break it either. As host, pick who goes home:</p>' +
+      '<div class="action-row">'+cands.map(function(p){ return '<button class="act-btn incorrect" data-action="manualTieBreak" data-arg="'+p.id+'">'+esc(p.name)+'</button>'; }).join('')+'</div>' +
+    '</div>';
+  }
+  var rows = alive.map(function(p){
+    var voted = !!H.votes[p.id];
+    return '<div class="vote-row"><span>'+esc(p.name)+'</span><span class="'+(voted?'yes':'no')+'">'+(voted?'Voted \u2713':'Waiting\u2026')+'</span></div>';
+  }).join('');
+  return topBarHtml() + '<div style="padding:24px 22px;text-align:center;">' +
+    '<h2>Voting \u2014 who\'s the weakest link?</h2>' +
+    '<p class="tag">'+votedCount+' of '+alive.length+' voted</p>' +
+    '<div class="vote-grid">'+rows+'</div>' +
+    '<button class="big-btn gold" style="margin-top:22px;" data-action="forceRevealVotes">Reveal votes</button>' +
+  '</div>';
+}
+
+function hostEliminationView(){
+  var e = H.lastElimination;
+  var aliveCount = H.players.filter(function(p){return p.alive;}).length;
+  return topBarHtml() + '<div class="elim-card">' +
+    '<div class="q-label">Voted off</div>' +
+    '<div class="name">'+esc(e.name)+'</div>' +
+    (e.note ? '<p class="tag">'+esc(e.note)+'</p>' : '') +
+    '<div class="tally">'+e.tally.map(function(t){ return '<div class="r"><span>'+esc(t.name)+'</span><span>'+t.votes+' vote'+(t.votes===1?'':'s')+'</span></div>'; }).join('')+'</div>' +
+    '<button class="big-btn gold" data-action="continueAfterElimination">'+(aliveCount===2?'Continue to final shootout':'Continue to round '+(H.round+1))+'</button>' +
+  '</div>';
+}
+
+function kickBoxes(s, pIdx){
+  var out = '';
+  for (var i=0;i<5;i++){
+    var r = s.rounds[i];
+    var v = r ? r['p'+pIdx] : null;
+    var cls = v==='correct' ? 'kick hit' : (v==='incorrect' ? 'kick miss' : 'kick');
+    out += '<div class="'+cls+'">'+(v==='correct'?'\u2713':(v==='incorrect'?'\u2717':''))+'</div>';
+  }
+  return '<div class="kicks">'+out+'</div>';
+}
+function hostShootoutView(){
+  var s = H.shootout;
+  var p0 = H.players.filter(function(p){return p.id===s.order[0];})[0];
+  var p1 = H.players.filter(function(p){return p.id===s.order[1];})[0];
+  var turnP = s.order[s.currentTurn]===p0.id ? p0 : p1;
+  var stage;
+  if (s.currentQuestion){
+    stage = '<div class="stage"><div class="q-label">'+(s.sudden?'Sudden death \u2014 ':'')+'Reading to '+esc(turnP.name)+'</div>' +
+      '<div class="q-text">'+esc(s.currentQuestion[0])+'</div>' +
+      '<div class="a-text">Answer: '+esc(s.currentQuestion[1])+'</div>' +
+      '<div class="action-row">' +
+        '<button class="act-btn correct" data-action="shootoutMark" data-arg="correct">Correct</button>' +
+        '<button class="act-btn incorrect" data-action="shootoutMark" data-arg="incorrect">Incorrect</button>' +
+      '</div></div>';
+  } else {
+    stage = '<div class="stage"><div class="q-label">'+(s.sudden?'Sudden death':'Up next')+'</div>' +
+      '<div class="q-text" style="color:var(--blue);">'+esc(turnP.name)+'</div>' +
+      '<div class="action-row"><button class="act-btn primary" data-action="shootoutNextQuestion">Ask next question</button></div></div>';
+  }
+  return topBarHtml() + '<div style="padding:16px 22px;">' +
+    '<div class="duel">' +
+      '<div class="duel-side'+(s.currentTurn===0?' active':'')+'"><div class="nm">'+esc(p0.name)+'</div>'+kickBoxes(s,0)+'</div>' +
+      '<div class="duel-side'+(s.currentTurn===1?' active':'')+'"><div class="nm">'+esc(p1.name)+'</div>'+kickBoxes(s,1)+'</div>' +
+    '</div>' +
+    '<div class="panel">'+stage+'</div>' +
+  '</div>';
+}
+
+function hostGameOverView(){
+  var standings = H.players.slice().sort(function(a,b){
+    if (a.alive !== b.alive) return a.alive ? -1 : 1;
+    return (b.correct-b.incorrect) - (a.correct-a.incorrect);
+  });
+  return '<div class="gameover">' +
+    '<div class="trophy">\uD83C\uDFC6</div>' +
+    '<div class="winner">'+esc(H.winner)+' wins!</div>' +
+    '<div class="standings">'+standings.map(function(p){
+      return '<div class="r"><span>'+esc(p.name)+'</span><span>'+p.correct+'\u2713 / '+p.incorrect+'\u2717</span></div>';
+    }).join('')+'</div>' +
+    '<button class="big-btn gold" style="margin-top:26px;" data-action="playAgain">Play again with same players</button>' +
+  '</div>';
+}
+
+/* ============================== VIEWS: PLAYER ============================== */
+function playerRootView(){
+  if (P.error){
+    return '<div class="landing"><div class="error-box">'+esc(P.error)+'</div><button class="big-btn gold" data-action="retryJoin">Try again</button></div>';
+  }
+  if (P.denied){
+    return '<div class="landing"><div class="error-box">'+esc(P.denied)+'</div><button class="big-btn gold" data-action="retryJoin">Back</button></div>';
+  }
+  if (!P.myId || !P.state){
+    return '<div class="landing"><p class="tag">Connecting to the host\u2026</p></div>';
+  }
+  var s = P.state;
+  var wrap = '<div class="player-wrap">' +
+    '<div class="p-header"><div class="rc">ROOM '+esc(s.roomCode)+'</div></div>' +
+    (P.connLost ? '<div class="error-box">Connection to host lost. Trying to reconnect\u2026</div>' : '');
+
+  var me = s.players.filter(function(p){return p.id===s.myId;})[0] || {correct:0,incorrect:0,alive:true};
+  var acc = accuracyOf(me);
+
+  var body;
+  if (s.phase === 'lobby') body = playerLobbyView(s);
+  else if (s.phase === 'playing') body = playerPlayingView(s, me);
+  else if (s.phase === 'voting') body = playerVotingView(s, me);
+  else if (s.phase === 'elimination') body = playerEliminationView(s, me);
+  else if (s.phase === 'shootout') body = playerShootoutView(s, me);
+  else if (s.phase === 'gameover') body = playerGameOverView(s, me);
+  else body = '<div class="center-msg">Waiting\u2026</div>';
+
+  return wrap + body + '<div class="footer-note">You are '+esc(P.myName)+'</div></div>';
+}
+
+function playerLobbyView(s){
+  var list = s.players.map(function(p){ return '<div class="chip"><span><span class="dot'+(p.connected?'':' off')+'"></span>'+esc(p.name)+'</span></div>'; }).join('');
+  return '<div class="panel"><h3>Waiting for the host to start\u2026</h3><div class="roster">'+list+'</div></div>';
+}
+
+function playerStatsHtml(me){
+  var acc = accuracyOf(me);
+  return '<div class="p-stats">' +
+    '<div class="p-stat"><b>'+(acc===null?'\u2014':acc+'%')+'</b><span>Accuracy</span></div>' +
+    '<div class="p-stat"><b>'+me.correct+'</b><span>Correct</span></div>' +
+    '<div class="p-stat"><b>'+me.incorrect+'</b><span>Incorrect</span></div>' +
+  '</div>';
+}
+
+function playerPlayingView(s, me){
+  if (!me.alive){
+    return '<div class="spectator-tag">You\'ve been voted off \u2014 spectating</div>' + playerStatsHtml(me) + '<div class="panel"><h3>Chain</h3>'+ladderHtml(s.chainIndex)+'<div class="bank-total"><div class="amt">'+fmtMoney(s.bank)+'</div><div class="lbl">Team bank</div></div></div>';
+  }
+  var isMyTurn = s.currentAskedId === s.myId;
+  var askedPlayer = s.players.filter(function(p){return p.id===s.currentAskedId;})[0];
+  var remain = s.timer.running ? fmtClock(s.timer.endsAt - Date.now()) : '--:--';
+  var low = s.timer.running && (s.timer.endsAt - Date.now()) < 10000;
+  var out = '<div class="timer-ring'+(low?' low':'')+'">'+remain+'</div>';
+  out += playerStatsHtml(me);
+  out += '<div class="turn-flag '+(isMyTurn?'yours':'theirs')+'">'+(isMyTurn ? "You're on the spot!" : (askedPlayer?esc(askedPlayer.name)+' is answering':'\u2014'))+'</div>';
+  if (s.currentQuestion) out += '<div class="panel" style="text-align:center;"><div class="q-label">Question</div><div class="q-text" style="font-size:19px;">'+esc(s.currentQuestion.q)+'</div></div>';
+  out += '<div class="panel"><h3>Chain</h3>'+ladderHtml(s.chainIndex)+'<div class="bank-total"><div class="amt">'+fmtMoney(s.bank)+'</div><div class="lbl">Team bank</div></div></div>';
+  if (isMyTurn){
+    out += '<button class="full-btn act-btn bank" data-action="callBank">'+(P.bankFlash ? 'Bank request sent \u2713' : 'Call bank!')+'</button>';
+  }
+  return out;
+}
+
+function playerVotingView(s, me){
+  if (!me.alive){
+    return '<div class="spectator-tag">You\'ve been voted off \u2014 spectating</div><div class="center-msg">The remaining players are voting on the weakest link.</div>';
+  }
+  if (s.votedAlready || P.localVoted){
+    return '<div class="panel" style="text-align:center;"><h3>Vote submitted</h3><p class="tag">Waiting for the rest of the group\u2026</p></div>';
+  }
+  var options = s.players.filter(function(p){return p.alive && p.id!==s.myId;});
+  var opts = '<option value="">Choose a player\u2026</option>' + options.map(function(p){ return '<option value="'+p.id+'">'+esc(p.name)+'</option>'; }).join('');
+  return '<div class="panel" style="text-align:center;"><h3>Who\'s the weakest link?</h3>' +
+    '<select id="voteSelect" class="vote-select">'+opts+'</select>' +
+    '<button class="full-btn act-btn incorrect" data-action="submitVote">Submit vote</button></div>';
+}
+
+function playerEliminationView(s, me){
+  var e = s.lastElimination;
+  return '<div class="elim-card"><div class="q-label">Voted off</div><div class="name">'+esc(e.name)+'</div>' +
+    (e.note?'<p class="tag">'+esc(e.note)+'</p>':'') +
+    '<div class="tally">'+e.tally.map(function(t){ return '<div class="r"><span>'+esc(t.name)+'</span><span>'+t.votes+' vote'+(t.votes===1?'':'s')+'</span></div>'; }).join('')+'</div>' +
+    (me.alive ? '<p class="tag">Get ready for the next round\u2026</p>' : '<div class="spectator-tag">You\'re spectating the rest of the game</div>') +
+  '</div>';
+}
+
+function playerShootoutView(s, me){
+  var sh = s.shootout;
+  var mine = sh.order.filter(function(o){return o.id===s.myId;}).length>0;
+  var out = '';
+  if (!mine){
+    out += '<div class="spectator-tag">You\'ve been voted off \u2014 spectating the final shootout</div>';
+  }
+  var turnO = sh.order[sh.currentTurn];
+  out += '<div class="duel">' +
+    sh.order.map(function(o,i){
+      return '<div class="duel-side'+(sh.currentTurn===i?' active':'')+'"><div class="nm">'+esc(o.name)+'</div>'+kickBoxes(sh,i)+'</div>';
+    }).join('') +
+  '</div>';
+  if (sh.sudden) out += '<div class="banner">Sudden death!</div>';
+  if (mine){
+    var isMyTurn = turnO.id === s.myId;
+    out += '<div class="turn-flag '+(isMyTurn?'yours':'theirs')+'">'+(isMyTurn?"You're up!":'Waiting for your turn')+'</div>';
+  } else {
+    out += '<div class="turn-flag theirs">'+esc(turnO.name)+' is up</div>';
+  }
+  return out;
+}
+
+function playerGameOverView(s, me){
+  var won = s.winner === (s.players.filter(function(p){return p.id===s.myId;})[0]||{}).name;
+  return '<div class="gameover"><div class="trophy">\uD83C\uDFC6</div><div class="winner">'+esc(s.winner)+' wins!</div>' +
+    (won ? '<p class="tag">That\'s you \uD83C\uDF89</p>' : '<p class="tag">Thanks for playing!</p>') +
+  '</div>';
+}
+
+/* ============================== RENDER DISPATCH ============================== */
+function render(){
+  var html;
+  if (role === null){
+    if (localView === 'hostSetup') html = hostSetupView();
+    else if (localView === 'playerSetup') html = playerSetupView();
+    else html = landingView();
+  } else if (role === 'host'){
+    html = hostRootView();
+  } else {
+    html = playerRootView();
+  }
+  $('#app').innerHTML = html;
+}
+
+document.addEventListener('click', function(e){
+  var el = e.target.closest('[data-action]');
+  if (!el) return;
+  var action = el.dataset.action;
+  var arg = el.dataset.arg;
+  if (Actions[action]) Actions[action](arg, el);
+});
+
+render();
+})();
+</script>
+</body>
+</html>
