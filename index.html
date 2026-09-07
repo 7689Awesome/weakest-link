@@ -104,6 +104,13 @@ input,select{font-family:'Inter',sans-serif;}
 .log{margin-top:14px;font-size:12px;color:var(--muted);display:flex;flex-direction:column;gap:6px;max-height:140px;overflow-y:auto;}
 .banner{background:rgba(232,178,61,0.15);border:1px solid var(--gold-dim);color:var(--gold);padding:10px 14px;border-radius:10px;font-size:14px;margin-bottom:12px;text-align:center;}
 
+/* question bank viewer */
+.qbank-list{max-height:320px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;padding-right:4px;margin-top:10px;}
+.qbank-row{display:flex;gap:10px;background:var(--panel-2);padding:8px 10px;border-radius:8px;font-size:13px;}
+.qbank-num{color:var(--muted);min-width:28px;}
+.qbank-q{color:var(--text);}
+.qbank-a{color:var(--green);font-size:12px;margin-top:2px;}
+
 /* voting */
 .vote-grid{display:flex;flex-direction:column;gap:8px;max-width:420px;margin:0 auto;}
 .vote-row{display:flex;justify-content:space-between;align-items:center;background:var(--panel-2);padding:10px 14px;border-radius:10px;font-size:14px;}
@@ -162,58 +169,7 @@ select.vote-select{width:100%;padding:14px;border-radius:10px;background:var(--p
 /* ============================== DATA ============================== */
 var CHAIN_VALUES = [20,50,100,150,200,300,400,500,600,700,800,900,1000];
 
-var QUESTIONS = [
-["What planet is known as the Red Planet?","Mars"],
-["What is the capital of Japan?","Tokyo"],
-["How many strings does a standard violin have?","Four"],
-["What ocean lies between Africa and the Americas?","The Atlantic Ocean"],
-["What gas do plants absorb from the atmosphere for photosynthesis?","Carbon dioxide"],
-["Who painted the Mona Lisa?","Leonardo da Vinci"],
-["What is the largest land animal on Earth?","The African elephant"],
-["In which country would you find the Great Barrier Reef?","Australia"],
-["What is the chemical symbol for gold?","Au"],
-["How many players are on a standard soccer team on the field?","Eleven"],
-["What is the tallest mountain in the world?","Mount Everest"],
-["What language has the most native speakers worldwide?","Mandarin Chinese"],
-["What year did the Titanic sink?","1912"],
-["What is the smallest prime number?","Two"],
-["Which organ pumps blood through the human body?","The heart"],
-["What is the currency of the United Kingdom?","The pound sterling"],
-["Who wrote the play Romeo and Juliet?","William Shakespeare"],
-["What is the freezing point of water in Celsius?","Zero degrees"],
-["What is the largest desert in the world?","The Sahara (or Antarctic Desert, if counting cold deserts)"],
-["Which planet has the most moons in our solar system?","Saturn"],
-["What is the capital city of Canada?","Ottawa"],
-["What metal is liquid at room temperature?","Mercury"],
-["How many continents are there?","Seven"],
-["What is the main ingredient in guacamole?","Avocado"],
-["What instrument has 88 keys?","The piano"],
-["Which country invented pizza as we know it?","Italy"],
-["What is the longest river in the world?","The Nile"],
-["What do bees collect and use to make honey?","Nectar"],
-["What is the study of earthquakes called?","Seismology"],
-["Which country gifted the Statue of Liberty to the United States?","France"],
-["What is the hardest natural substance on Earth?","Diamond"],
-["How many bones are in the adult human body?","206"],
-["What is the capital of Egypt?","Cairo"],
-["What sport is known as 'the beautiful game'?","Football (soccer)"],
-["What is the largest planet in our solar system?","Jupiter"],
-["What year did World War II end?","1945"],
-["What is the main gas found in the air we breathe?","Nitrogen"],
-["Which animal is known as the King of the Jungle?","The lion"],
-["What is the capital of Australia?","Canberra"],
-["How many colors are in a rainbow?","Seven"],
-["What is the tallest living land animal?","The giraffe"],
-["What is the world's most spoken second language?","English"],
-["What is the chemical symbol for water?","H2O"],
-["Which country is home to the kangaroo in the wild?","Australia"],
-["What is the largest ocean on Earth?","The Pacific Ocean"],
-["Who developed the theory of relativity?","Albert Einstein"],
-["What is the smallest country in the world?","Vatican City"],
-["What natural satellite orbits the Earth?","The Moon"],
-["What is the fastest land animal?","The cheetah"],
-["What shape has three sides?","A triangle"]
-];
+var QUESTIONS = [["What is the capital of France?", "Paris"], ["What is the capital of Japan?", "Tokyo"], ["What is the capital of Canada?", "Ottawa"], ["What is the capital of Australia?", "Canberra"], ["What is the capital of Egypt?", "Cairo"], ["What is the capital of Italy?", "Rome"], ["What is the capital of Germany?", "Berlin"], ["What is the capital of Spain?", "Madrid"], ["What is the capital of Russia?", "Moscow"], ["What is the capital of China?", "Beijing"], ["What is the capital of India?", "New Delhi"], ["What is the capital of Brazil?", "Brasília"], ["What is the capital of Mexico?", "Mexico City"], ["What is the capital of South Korea?", "Seoul"], ["What is the capital of the United Kingdom?", "London"], ["What is the capital of Greece?", "Athens"], ["What is the capital of Turkey?", "Ankara"], ["What is the capital of Thailand?", "Bangkok"], ["What is the capital of Argentina?", "Buenos Aires"], ["What is the capital of Kenya?", "Nairobi"], ["What is the capital of Sweden?", "Stockholm"], ["What is the capital of Norway?", "Oslo"], ["What is the capital of Portugal?", "Lisbon"], ["What is the capital of the Netherlands?", "Amsterdam"], ["What is the capital of Switzerland?", "Bern"], ["What is the capital of Austria?", "Vienna"], ["What is the capital of Poland?", "Warsaw"], ["What is the capital of Ireland?", "Dublin"], ["What is the capital of Cuba?", "Havana"], ["What is the capital of Indonesia?", "Jakarta"], ["What is the largest country in the world by area?", "Russia"], ["What is the smallest country in the world?", "Vatican City"], ["What is the longest river in the world?", "The Nile"], ["What is the largest ocean on Earth?", "The Pacific Ocean"], ["What is the largest hot desert in the world?", "The Sahara"], ["What is the tallest mountain in the world?", "Mount Everest"], ["Which continent is the Sahara Desert located on?", "Africa"], ["Which continent has the most countries?", "Africa"], ["What is the smallest continent by land area?", "Australia"], ["What is the largest continent by area?", "Asia"], ["What ocean lies between Africa and the Americas?", "The Atlantic Ocean"], ["What is the longest wall ever built, located in China?", "The Great Wall of China"], ["Which country has the most natural lakes?", "Canada"], ["What is the driest continent on Earth?", "Antarctica"], ["Which country is considered transcontinental, in both Europe and Asia?", "Turkey"], ["What is the capital of the United States?", "Washington, D.C."], ["What is the most populous country in the world?", "India"], ["Which US state is the largest by area?", "Alaska"], ["Which US state is the smallest by area?", "Rhode Island"], ["What is the tallest waterfall in the world?", "Angel Falls"], ["Which country is home to the Great Barrier Reef?", "Australia"], ["What is the name of the strait separating Europe and Africa near Spain?", "The Strait of Gibraltar"], ["Which South American country is named after a famous explorer?", "Colombia"], ["What is the highest capital city in the world?", "La Paz, Bolivia"], ["What is the currency of Japan?", "The yen"], ["What is the currency of the United Kingdom?", "The pound sterling"], ["What is the currency used by most of the European Union?", "The euro"], ["Which African country was formerly known as Abyssinia?", "Ethiopia"], ["What is the name of the mountain range that runs through South America?", "The Andes"], ["What is the name of the largest rainforest in the world?", "The Amazon rainforest"], ["Which continent lies entirely within the Southern Hemisphere and is also a country?", "Australia"], ["What is the capital of New Zealand?", "Wellington"], ["Which country has the most time zones?", "France"], ["What is the northernmost capital city in the world?", "Reykjavik"], ["Which sea separates Saudi Arabia from Egypt?", "The Red Sea"], ["What is the name of the canal that connects the Mediterranean Sea and the Red Sea?", "The Suez Canal"], ["What is the name of the canal that connects the Atlantic and Pacific Oceans through Central America?", "The Panama Canal"], ["Which country is famous for its canals and windmills?", "The Netherlands"], ["What island country lies just south of India?", "Sri Lanka"], ["Which desert covers much of northern China and Mongolia?", "The Gobi Desert"], ["What planet is known as the Red Planet?", "Mars"], ["What gas do plants absorb from the atmosphere for photosynthesis?", "Carbon dioxide"], ["What is the chemical symbol for gold?", "Au"], ["What is the chemical symbol for water?", "H2O"], ["What is the freezing point of water in Celsius?", "Zero degrees"], ["What is the boiling point of water in Celsius at sea level?", "100 degrees"], ["What is the powerhouse of the cell called?", "The mitochondria"], ["What force pulls objects toward the Earth?", "Gravity"], ["What is the hardest natural substance on Earth?", "Diamond"], ["What metal is liquid at room temperature?", "Mercury"], ["What is the largest organ in the human body?", "The skin"], ["How many bones are in the adult human body?", "206"], ["What is the main gas found in the air we breathe?", "Nitrogen"], ["What organ pumps blood through the human body?", "The heart"], ["What is the study of earthquakes called?", "Seismology"], ["What is the study of weather called?", "Meteorology"], ["What part of the plant conducts photosynthesis?", "The leaves"], ["What is the smallest unit of life?", "The cell"], ["What gas do humans and animals need to breathe to survive?", "Oxygen"], ["What is the process by which plants make their food called?", "Photosynthesis"], ["What is the chemical symbol for sodium?", "Na"], ["What is the chemical symbol for iron?", "Fe"], ["What natural phenomenon is measured using the Richter scale?", "Earthquakes"], ["What type of energy is stored in a battery called?", "Chemical energy"], ["What blood type is known as the universal donor?", "O negative"], ["What is the largest bone in the human body?", "The femur"], ["What is the smallest bone in the human body?", "The stapes"], ["How many chambers does the human heart have?", "Four"], ["What vitamin does the body produce when exposed to sunlight?", "Vitamin D"], ["What is the pH value of pure water?", "Seven"], ["What is the term for an animal that eats only plants?", "Herbivore"], ["What is the term for an animal that eats only meat?", "Carnivore"], ["What is the term for an animal that eats both plants and meat?", "Omnivore"], ["What natural satellite orbits the Earth?", "The Moon"], ["What causes the tides in Earth's oceans?", "The gravitational pull of the Moon"], ["What is the study of living organisms called?", "Biology"], ["What is the study of matter and energy called?", "Physics"], ["What is the study of chemicals and their reactions called?", "Chemistry"], ["What is the closest star to Earth?", "The Sun"], ["What is the term for water changing directly from a solid to a gas?", "Sublimation"], ["What is the chemical formula for table salt?", "NaCl"], ["What part of the body is affected by asthma?", "The lungs"], ["What gas makes up most of the Earth's atmosphere?", "Nitrogen"], ["What is the name of the layer of gases surrounding Earth?", "The atmosphere"], ["What natural disaster is measured in categories from 1 to 5?", "A hurricane"], ["What is the term for the variety of life in the world or a habitat?", "Biodiversity"], ["What is the process of a caterpillar becoming a butterfly called?", "Metamorphosis"], ["Besides support, what is a main function of the human skeleton?", "Protecting internal organs"], ["What is the largest gland in the human body?", "The liver"], ["What element does the symbol O represent?", "Oxygen"], ["What element does the symbol C represent?", "Carbon"], ["What is the approximate speed of light in a vacuum?", "About 300,000 kilometers per second"], ["Who developed the theory of evolution by natural selection?", "Charles Darwin"], ["Who developed the theory of relativity?", "Albert Einstein"], ["Who is credited with discovering gravity after seeing a falling apple?", "Isaac Newton"], ["Which scientist is known for research on radioactivity and won two Nobel Prizes?", "Marie Curie"], ["What is DNA short for?", "Deoxyribonucleic acid"], ["What is the basic unit of heredity called?", "A gene"], ["What is the term for the force that opposes motion between two surfaces?", "Friction"], ["What state of matter has no fixed shape or volume?", "Gas"], ["What state of matter has a fixed volume but no fixed shape?", "Liquid"], ["What is the center of an atom called?", "The nucleus"], ["What are the tiny particles that orbit the nucleus of an atom called?", "Electrons"], ["What is the study of the stars and outer space called?", "Astronomy"], ["What is the term for a substance that speeds up a chemical reaction without being consumed?", "A catalyst"], ["What natural process turns water vapor into clouds?", "Condensation"], ["What is the main function of red blood cells?", "To carry oxygen through the body"], ["What sense organ is responsible for detecting light?", "The eye"], ["What is the average human body temperature in Celsius?", "37 degrees"], ["What is the term for animals that are active mainly at night?", "Nocturnal"], ["What year did World War II end?", "1945"], ["What year did World War I begin?", "1914"], ["Who was the first President of the United States?", "George Washington"], ["In what year did the Titanic sink?", "1912"], ["Which country gifted the Statue of Liberty to the United States?", "France"], ["Who was the British Prime Minister during most of World War II?", "Winston Churchill"], ["What ancient civilization built the pyramids of Giza?", "The ancient Egyptians"], ["What wall divided East and West Berlin during the Cold War?", "The Berlin Wall"], ["In what year did the Berlin Wall fall?", "1989"], ["Who was the first man to walk on the Moon?", "Neil Armstrong"], ["In what year did the first Moon landing happen?", "1969"], ["What ship did the Pilgrims sail to America on in 1620?", "The Mayflower"], ["Who was the ancient Egyptian queen famous for her relationships with Julius Caesar and Mark Antony?", "Cleopatra"], ["What empire was ruled by Julius Caesar?", "The Roman Empire"], ["Who painted the ceiling of the Sistine Chapel?", "Michelangelo"], ["What document, signed in 1215, limited the power of the English king?", "The Magna Carta"], ["Who was the leader of Nazi Germany during World War II?", "Adolf Hitler"], ["What year did the United States declare independence?", "1776"], ["Who wrote the Declaration of Independence?", "Thomas Jefferson"], ["What war was fought between the American North and South from 1861 to 1865?", "The American Civil War"], ["Who was the 16th President of the United States, who led the country through the Civil War?", "Abraham Lincoln"], ["What ancient wonder of the world was located in Alexandria, Egypt?", "The Lighthouse of Alexandria"], ["Which explorer is credited with reaching the Americas in 1492?", "Christopher Columbus"], ["What was the name of the period of rebuilding art and learning in Europe from the 14th to 17th century?", "The Renaissance"], ["Who was the Queen of England during much of the 19th century, giving her name to an era?", "Queen Victoria"], ["What was the name of the ship that Charles Darwin sailed on during his famous voyage?", "HMS Beagle"], ["What country was ruled by pharaohs?", "Ancient Egypt"], ["Who was the first Emperor of Rome?", "Augustus"], ["What was the name of the global pandemic that occurred from 1918 to 1919?", "The Spanish Flu"], ["In what year did India gain independence from Britain?", "1947"], ["Who was the South African leader who fought against apartheid and became president in 1994?", "Nelson Mandela"], ["What was the name of the Cold War rival to the United States?", "The Soviet Union"], ["Who was the first person to fly solo across the Atlantic Ocean?", "Charles Lindbergh"], ["What treaty officially ended World War I?", "The Treaty of Versailles"], ["What ancient Greek city-state is considered the birthplace of democracy?", "Athens"], ["Who was the Macedonian king who built one of the largest empires of the ancient world?", "Alexander the Great"], ["What was the name of the wall built by the Romans in northern England?", "Hadrian's Wall"], ["In which country did the French Revolution take place?", "France"], ["What year did the French Revolution begin?", "1789"], ["Who was the French military leader who became Emperor in the early 1800s?", "Napoleon Bonaparte"], ["What was the name of the era of strict racial segregation in South Africa?", "Apartheid"], ["Who was assassinated in Sarajevo in 1914, an event that helped trigger World War I?", "Archduke Franz Ferdinand"], ["What was the name of the airlift that supplied West Berlin in 1948-1949?", "The Berlin Airlift"], ["What year did the Wright brothers achieve the first powered flight?", "1903"], ["Who was the first woman to fly solo across the Atlantic Ocean?", "Amelia Earhart"], ["What was the name of the great fire that destroyed much of London in 1666?", "The Great Fire of London"], ["Who was the King of England who had six wives?", "Henry VIII"], ["What was the name of the ancient library famous for its vast collection of scrolls, located in Egypt?", "The Library of Alexandria"], ["What was the capital of the Byzantine Empire?", "Constantinople"], ["What is Constantinople known as today?", "Istanbul"], ["What was the name of the trade route connecting China and the Mediterranean?", "The Silk Road"], ["Who led the Cuban Revolution and later became Cuba's leader?", "Fidel Castro"], ["What approach did Mahatma Gandhi's independence movement in India rely on?", "Nonviolent resistance"], ["What year did the Soviet Union collapse?", "1991"], ["Who was assassinated in 1963 while serving as US President?", "John F. Kennedy"], ["What was the name of the 1969 music festival held in upstate New York?", "Woodstock"], ["Who was the civil rights leader who delivered the 'I Have a Dream' speech?", "Martin Luther King Jr."], ["What year did apartheid officially end in South Africa?", "1994"], ["What war was fought in Vietnam with heavy US involvement during the 1960s and 70s?", "The Vietnam War"], ["What year was the United States Constitution ratified?", "1788"], ["Who wrote the play Romeo and Juliet?", "William Shakespeare"], ["Who painted the Mona Lisa?", "Leonardo da Vinci"], ["What instrument has 88 keys?", "The piano"], ["How many strings does a standard violin have?", "Four"], ["Who wrote the Harry Potter book series?", "J.K. Rowling"], ["What is the name of the wizarding school in Harry Potter?", "Hogwarts"], ["Who directed the movies Jaws and E.T.?", "Steven Spielberg"], ["What is the name of the famous clock tower in London?", "Big Ben"], ["Who composed the Ninth Symphony despite being deaf?", "Ludwig van Beethoven"], ["What art movement is Salvador Dalí associated with?", "Surrealism"], ["Who wrote the novel Pride and Prejudice?", "Jane Austen"], ["Who wrote the novel Moby-Dick?", "Herman Melville"], ["What is the name of the boy wizard in J.K. Rowling's book series?", "Harry Potter"], ["Who painted Starry Night?", "Vincent van Gogh"], ["What Italian artist sculpted the statue of David?", "Michelangelo"], ["What is the best-selling video game series featuring a plumber?", "Super Mario"], ["Who created the fictional detective Sherlock Holmes?", "Arthur Conan Doyle"], ["What Disney movie features a snowman named Olaf?", "Frozen"], ["What is the name of the fictional continent in The Lord of the Rings?", "Middle-earth"], ["Who wrote The Lord of the Rings?", "J.R.R. Tolkien"], ["What museum in Paris houses the Mona Lisa?", "The Louvre"], ["What opera house is famous for its sail-shaped roof in Sydney?", "The Sydney Opera House"], ["Who directed the original Star Wars trilogy?", "George Lucas"], ["What is the name of the fictional British spy created by Ian Fleming?", "James Bond"], ["What is the name of the film franchise centered on Marvel superheroes?", "The Marvel Cinematic Universe"], ["Who composed The Four Seasons?", "Antonio Vivaldi"], ["What is the name of the coffee shop featured in the sitcom Friends?", "Central Perk"], ["Who wrote the dystopian novel 1984?", "George Orwell"], ["Who wrote the novel To Kill a Mockingbird?", "Harper Lee"], ["What is the term for a 14-line poem, often about love?", "A sonnet"], ["Who is known as the King of Pop?", "Michael Jackson"], ["Who is known as the Queen of Pop?", "Madonna"], ["What band did John Lennon and Paul McCartney belong to?", "The Beatles"], ["What city is considered the birthplace of jazz music?", "New Orleans"], ["What is the name of the fictional wizard who mentors Harry Potter?", "Albus Dumbledore"], ["What fairy tale character pricks her finger and falls asleep for 100 years?", "Sleeping Beauty"], ["Who wrote well-known French versions of fairy tales like Cinderella and Sleeping Beauty?", "Charles Perrault"], ["What is the term for a piece of music written for a solo instrument and orchestra?", "A concerto"], ["What Renaissance artist is known for painting The Last Supper?", "Leonardo da Vinci"], ["What is the name of the theater company associated with William Shakespeare in London?", "The Globe Theatre"], ["Who composed the opera The Marriage of Figaro?", "Wolfgang Amadeus Mozart"], ["What is the name of the famous art museum in New York City known by the initials MET?", "The Metropolitan Museum of Art"], ["What long-running animated sitcom is set in the fictional town of Springfield?", "The Simpsons"], ["What is the highest award given in the film industry, presented annually by the Academy?", "The Oscar"], ["What British rock band released the album Abbey Road?", "The Beatles"], ["What is the name of the young lion prince in Disney's The Lion King?", "Simba"], ["Who wrote the novel The Great Gatsby?", "F. Scott Fitzgerald"], ["What is the term for traditional stories passed down orally through generations?", "Folklore"], ["What ballet features the character of the Sugar Plum Fairy?", "The Nutcracker"], ["Who composed The Nutcracker ballet?", "Pyotr Ilyich Tchaikovsky"], ["What wooden puppet dreams of becoming a real boy in the classic story?", "Pinocchio"], ["Who wrote the play Hamlet?", "William Shakespeare"], ["What is the name of the famous mouse character created by Walt Disney?", "Mickey Mouse"], ["What instrument does a drummer primarily play in a band?", "The drums"], ["What genre of music originated in Jamaica and is associated with Bob Marley?", "Reggae"], ["What art style, pioneered by Pablo Picasso, uses geometric shapes?", "Cubism"], ["Who directed the movie Titanic (1997)?", "James Cameron"], ["What is the name of the fictional archaeologist played by Harrison Ford in a famous film series?", "Indiana Jones"], ["What is the name of the famous ballet about a princess turned into a swan?", "Swan Lake"], ["Who wrote the play A Midsummer Night's Dream?", "William Shakespeare"], ["How many players are on a standard soccer team on the field?", "Eleven"], ["How many players are on a basketball team on the court at one time?", "Five"], ["What sport is known as 'the beautiful game'?", "Football (soccer)"], ["How often are the Summer Olympic Games held?", "Every four years"], ["In tennis, what is a score of zero called?", "Love"], ["What sport is played at Wimbledon?", "Tennis"], ["How many holes are played in a standard round of golf?", "18"], ["What sport uses a shuttlecock?", "Badminton"], ["In baseball, how many players are on the field for one team?", "Nine"], ["How many rings are on the Olympic flag?", "Five"], ["What sport is associated with the Tour de France?", "Cycling"], ["What country invented the sport of rugby?", "England"], ["How many periods are in a standard game of ice hockey?", "Three"], ["What is the term for a score of three under par on a single hole in golf?", "An albatross"], ["What is the term for a score of one under par on a single hole in golf?", "A birdie"], ["What is the maximum score possible in a single game of ten-pin bowling?", "300"], ["What sport is played at the Kentucky Derby?", "Horse racing"], ["How many players are on a volleyball team on the court?", "Six"], ["What is the national sport of Japan?", "Sumo wrestling"], ["What martial art originated in Brazil and focuses on ground grappling?", "Brazilian Jiu-Jitsu"], ["What is the term for a hard hit that sends the ball straight down into the opponent's court in volleyball?", "A spike"], ["How many points is a touchdown worth in American football?", "Six"], ["What sport is played by the New York Yankees?", "Baseball"], ["What sport is played by the Los Angeles Lakers?", "Basketball"], ["What sport features events like the 100m dash and the marathon?", "Athletics (track and field)"], ["What is the standard distance of a marathon in miles?", "26.2 miles"], ["In which sport would you perform a slam dunk?", "Basketball"], ["What is the term for a perfect score in gymnastics?", "A ten"], ["What sport uses terms like 'love,' 'deuce,' and 'ace'?", "Tennis"], ["How many players are on a standard cricket team?", "Eleven"], ["What piece of equipment do you use to hit the ball in cricket and baseball?", "A bat"], ["What winter sport involves sliding down an icy track on a sled?", "Bobsledding"], ["What sport is associated with the term 'hat-trick'?", "Ice hockey"], ["What country has won the most FIFA World Cups?", "Brazil"], ["How often is the FIFA World Cup held?", "Every four years"], ["What sport is played at the US Open, Wimbledon, French Open, and Australian Open?", "Tennis"], ["What is the name for the area a soccer team must get the ball into to score?", "The goal"], ["What is boxing categorized by, based on the fighters' body weight?", "Weight classes"], ["What is the maximum number of clubs a golfer is allowed to carry in their bag?", "14"], ["In American football, how many downs does a team get to advance ten yards?", "Four"], ["What sport is played on a 'pitch' in the UK and often called 'football'?", "Soccer"], ["What is the name of the trophy awarded to the winner of the NHL championship?", "The Stanley Cup"], ["What sport does Serena Williams play?", "Tennis"], ["What sport does Usain Bolt famously compete in?", "Sprinting"], ["What sport does Michael Phelps famously compete in?", "Swimming"], ["What sport is played in the Super Bowl?", "American football"], ["What color jersey does the overall leader of the Tour de France wear?", "Yellow"], ["What is it called when a golfer hits the ball into the hole with a single stroke?", "A hole in one"], ["What sport features the positions of pitcher and catcher?", "Baseball"], ["What Olympic sport involves routines performed on a balance beam, bars, and floor?", "Gymnastics"], ["What is the main ingredient in guacamole?", "Avocado"], ["What country is credited with inventing pizza as we know it?", "Italy"], ["What grain is used to make bread?", "Wheat"], ["What is the main ingredient in hummus?", "Chickpeas"], ["What fruit is used to make wine?", "Grapes"], ["What drink is made from fermented grapes?", "Wine"], ["What is the main ingredient in traditional sushi?", "Rice"], ["What spice is derived from the crocus flower and is the most expensive by weight?", "Saffron"], ["What popular food is made by fermenting milk with live bacterial cultures?", "Yogurt"], ["What vegetable is the main ingredient in French fries?", "Potatoes"], ["What is the main ingredient in traditional Japanese miso soup?", "Fermented soybean paste"], ["What nut is traditionally used to make pesto sauce along with basil?", "Pine nuts"], ["What is the world's most consumed beverage after water?", "Tea"], ["What country is generally credited as the origin of the croissant's popularity?", "France"], ["What spice gives traditional Indian curry dishes their yellow color?", "Turmeric"], ["What cheese is traditionally used on a Margherita pizza?", "Mozzarella"], ["What ingredient gives traditional Caesar dressing its distinctive salty flavor?", "Anchovies"], ["What is traditionally served with scones in a British cream tea?", "Clotted cream and jam"], ["What is the main ingredient in chocolate?", "Cocoa beans"], ["What drink is made by brewing roasted coffee beans?", "Coffee"], ["What country is often credited with popularizing the hamburger?", "The United States"], ["What is the main ingredient in traditional Italian risotto?", "Rice"], ["What is the main ingredient in traditional French onion soup?", "Onions"], ["What food family includes the ghost pepper and habanero, known for spiciness?", "Chili peppers"], ["What is the main starchy ingredient in traditional Japanese ramen?", "Wheat noodles"], ["What is the main ingredient in gazpacho, a cold Spanish soup?", "Tomatoes"], ["What nut is the main ingredient in marzipan?", "Almonds"], ["What is the main ingredient in the batter used to make traditional French crepes?", "Flour"], ["What is a place where grapes are grown for winemaking called?", "A vineyard"], ["What popular condiment is made primarily from tomatoes?", "Ketchup"], ["What is the name of the thin, round Mexican flatbread made from corn or wheat?", "A tortilla"], ["What fermented cabbage dish is a traditional Korean side dish?", "Kimchi"], ["What legume is the main ingredient in traditional Middle Eastern falafel?", "Chickpeas"], ["What is the world's most popular spice, derived from the Piper nigrum plant?", "Black pepper"], ["What is the main sweetener extracted from sugar cane or sugar beets?", "Sugar"], ["What spirit is traditionally used as the base of a Bloody Mary cocktail?", "Vodka"], ["What is the main ingredient in a traditional omelet?", "Eggs"], ["What Italian dessert's name translates to 'pick me up'?", "Tiramisu"], ["What grain is most commonly used to brew beer?", "Barley"], ["What fruit is used in a traditional British apple crumble?", "Apples"], ["What language has the most native speakers worldwide?", "Mandarin Chinese"], ["How many letters are in the English alphabet?", "26"], ["What is the official language of Brazil?", "Portuguese"], ["What is the official language of Mexico?", "Spanish"], ["What language is primarily spoken in Egypt?", "Arabic"], ["What alphabet is used to write the Russian language?", "The Cyrillic alphabet"], ["What is the most widely spoken second language in the world?", "English"], ["What ancient language is the basis for many modern European languages?", "Latin"], ["What is the term for a word that reads the same forwards and backwards?", "A palindrome"], ["What is the term for two words that sound the same but have different meanings, like 'flower' and 'flour'?", "Homophones"], ["What punctuation mark is used to indicate a question?", "A question mark"], ["What is often cited as one of the longest words in English, referring to a lung disease?", "Pneumonoultramicroscopicsilicovolcanoconiosis"], ["What is the study of the origin of words called?", "Etymology"], ["What is the term for a figure of speech comparing two things using 'like' or 'as'?", "A simile"], ["What ancient writing system used pictures and symbols, common in ancient Egypt?", "Hieroglyphics"], ["What is the official language of France?", "French"], ["What is the official language of Germany?", "German"], ["What is a word that means the opposite of another word called?", "An antonym"], ["What is a word that means the same as another word called?", "A synonym"], ["What broad language family does English belong to?", "Germanic"], ["What is the term for a fictitious name used by an author instead of their real name?", "A pen name"], ["What is the sign language used primarily in the United States called?", "American Sign Language"], ["What is the name for the number symbols most commonly used worldwide today?", "Arabic numerals"], ["What is the official language of most South American countries besides Brazil?", "Spanish"], ["What do you call a group of words that doesn't form a complete sentence?", "A sentence fragment"], ["What is the traditional greeting word used in Hawaii?", "Aloha"], ["What is the term for a word borrowed from another language, like 'café' from French?", "A loanword"], ["What is the international language used in air traffic control?", "English"], ["What is the most commonly used letter in the English language?", "The letter E"], ["What is the name of one of the two Japanese phonetic syllabaries used for writing?", "Hiragana"], ["What is the smallest prime number?", "Two"], ["How many sides does a triangle have?", "Three"], ["How many sides does a hexagon have?", "Six"], ["What is the value of pi rounded to two decimal places?", "3.14"], ["What is the sum of the interior angles of a triangle?", "180 degrees"], ["What is the square root of 64?", "Eight"], ["How many degrees are in a right angle?", "90 degrees"], ["What is 7 multiplied by 8?", "56"], ["What is the term for a number that can only be divided evenly by 1 and itself?", "A prime number"], ["How many sides does an octagon have?", "Eight"], ["What is the term for a shape with four equal sides and four right angles?", "A square"], ["What is the next number in the sequence 2, 4, 8, 16?", "32"], ["How many degrees are in a full circle?", "360 degrees"], ["What is the term for the longest side of a right triangle?", "The hypotenuse"], ["What is 10 percent of 200?", "20"], ["What is the Roman numeral for 50?", "L"], ["What is the Roman numeral for 100?", "C"], ["How many zeros are in one million?", "Six"], ["What is the term for a number multiplied by itself?", "A squared number"], ["What is the result of dividing any number by zero in standard math?", "Undefined"], ["How many minutes are in a full day?", "1,440"], ["What is the term for two lines that never intersect and stay the same distance apart?", "Parallel lines"], ["What is the value of 5 factorial?", "120"], ["How many sides does a pentagon have?", "Five"], ["What is the term for a triangle with all three sides of equal length?", "Equilateral"], ["What number comes after 999 in standard counting?", "1,000"], ["What is 12 multiplied by 12?", "144"], ["What is the term for the distance around a circle?", "The circumference"], ["What is the average of 10, 20, and 30?", "20"], ["How many even numbers are there between 1 and 10, inclusive?", "Five"], ["What is the largest land animal on Earth?", "The African elephant"], ["What is the fastest land animal?", "The cheetah"], ["What is the tallest living land animal?", "The giraffe"], ["What is the largest animal alive today?", "The blue whale"], ["What animal is often called the 'King of the Jungle'?", "The lion"], ["What is a baby kangaroo called?", "A joey"], ["What is a baby dog called?", "A puppy"], ["What is a baby cat called?", "A kitten"], ["What is a group of lions called?", "A pride"], ["What is a group of wolves called?", "A pack"], ["What is a group of fish called?", "A school"], ["What flightless bird is famous for its excellent swimming ability?", "The penguin"], ["What is the only mammal capable of true flight?", "The bat"], ["What is the largest species of big cat?", "The tiger"], ["What reptile is famous for changing color to blend into its surroundings?", "The chameleon"], ["What is the slowest-moving mammal in the world?", "The sloth"], ["What insect is known for producing honey?", "The bee"], ["What is a group of crows called?", "A murder"], ["What sea creature has eight arms?", "The octopus"], ["What is the tallest bird in the world?", "The ostrich"], ["What bird has the largest wingspan of any living bird?", "The albatross"], ["What animal is known for its black and white stripes?", "The zebra"], ["What Australian marsupial carries its young in a pouch?", "The kangaroo"], ["What is the national bird of the United States?", "The bald eagle"], ["What is the fastest bird in the world during a hunting dive?", "The peregrine falcon"], ["What is the largest species of shark?", "The whale shark"], ["What continent has penguins living wild alongside a few other southern regions?", "Antarctica"], ["What animal has the longest neck relative to its body?", "The giraffe"], ["What is it called when a snake sheds its skin?", "Molting"], ["What is the name for an adult male deer with antlers?", "A stag"], ["What animal is known as man's best friend?", "The dog"], ["What is the largest species of primate?", "The gorilla"], ["What intelligent sea mammal is known for using echolocation?", "The dolphin"], ["What is a baby cow called?", "A calf"], ["What is a baby horse called?", "A foal"], ["What bird is known for mimicking human speech?", "The parrot"], ["What is the only country where kangaroos are found in the wild?", "Australia"], ["What insect undergoes complete metamorphosis, changing from a caterpillar into this flying creature?", "A butterfly"], ["What is the largest living rodent in the world?", "The capybara"], ["What animal is known for building dams in rivers and streams?", "The beaver"], ["What is the closest planet to the Sun?", "Mercury"], ["What planet is known for its prominent rings?", "Saturn"], ["What is the largest planet in our solar system?", "Jupiter"], ["What is the smallest planet in our solar system?", "Mercury"], ["How many planets are in our solar system?", "Eight"], ["What planet is often called Earth's twin due to its similar size?", "Venus"], ["What is the name of the galaxy that contains our solar system?", "The Milky Way"], ["What is the term for a star that suddenly increases greatly in brightness before fading?", "A supernova"], ["Who was the first human to travel into space?", "Yuri Gagarin"], ["What was the name of the first artificial satellite launched into space?", "Sputnik 1"], ["What space agency was responsible for the Apollo Moon missions?", "NASA"], ["What is the name of NASA's famous space telescope launched in 1990?", "The Hubble Space Telescope"], ["What planet has the most moons in our solar system?", "Saturn"], ["What is the term for the point in an orbit where a planet is closest to the Sun?", "Perihelion"], ["What force keeps planets in orbit around the Sun?", "Gravity"], ["What is a large, rocky object orbiting the Sun that is too small to be a planet called?", "An asteroid"], ["What is a small icy object that orbits the Sun and can form a glowing tail called?", "A comet"], ["What is the term for the collapsed core of a massive star, with gravity so strong not even light escapes?", "A black hole"], ["What dwarf planet used to be considered the ninth planet in our solar system?", "Pluto"], ["What is the name of the space station currently orbiting Earth, involving multiple countries?", "The International Space Station"], ["What is the name of Earth's only natural satellite?", "The Moon"], ["What causes a solar eclipse?", "The Moon passing between the Earth and the Sun"], ["What causes a lunar eclipse?", "The Earth passing between the Sun and the Moon"], ["What is the term for a group of stars that forms a recognizable pattern?", "A constellation"], ["What constellation is also known as the Great Bear?", "Ursa Major"], ["What is the brightest star in the night sky, excluding the Sun?", "Sirius"], ["What is the term for one complete orbit of the Earth around the Sun?", "A year"], ["What planet is famous for the Great Red Spot, a giant storm?", "Jupiter"], ["What is the name given to astronauts from Russia?", "Cosmonauts"], ["What theory describes the origin of the universe from a single expanding point?", "The Big Bang theory"], ["How many days are in a leap year?", "366"], ["How many hours are in a day?", "24"], ["How many days are in a standard week?", "Seven"], ["What is the term for a period of ten years?", "A decade"], ["What is the term for a period of 100 years?", "A century"], ["What is the currency used in the United States?", "The dollar"], ["What is the tallest man-made structure in the world?", "The Burj Khalifa"], ["What color is a stop sign in most countries?", "Red"], ["What side of the road do cars drive on in the United States?", "The right side"], ["How many players are needed to play a standard game of chess?", "Two"], ["How many squares are on a standard chessboard?", "64"], ["What is the name for a baby's first set of teeth?", "Milk teeth"], ["What is the term for the annual celebration of a person's birth date?", "A birthday"], ["What metal is traditionally used to make a wedding ring in Western culture?", "Gold"], ["How long does it take the Earth to rotate once on its axis?", "24 hours"], ["What tool is used to tell direction, with a needle pointing north?", "A compass"], ["What is the name for money given to a server for good service at a restaurant?", "A tip"], ["How many minutes are in an hour?", "60"], ["What is the standard legal voting age in the United States?", "18"], ["What tool is used to measure temperature?", "A thermometer"]];
 
 /* ============================== HELPERS ============================== */
 function $(sel){ return document.querySelector(sel); }
@@ -256,6 +212,10 @@ var peer = null;
 
 var H = null;              // host authoritative state
 var hostConns = {};        // playerId -> DataConnection
+var customQuestionsDraft = ''; // mirrors the #customQuestions textarea across re-renders
+var csvParsedQuestions = null; // [q,a] pairs parsed from an uploaded CSV, pending confirmation
+var csvFileName = null;
+var showQuestionBank = false; // toggles the full question-bank viewer
 
 var P = {                  // player-side local wrapper
   conn: null, roomCode: '', myName: '', myId: null,
@@ -273,7 +233,7 @@ function newHostState(){
     timer:{endsAt:0,duration:60,running:false},
     votes:{}, lastElimination:null, tieCandidates:null, tieTally:null,
     bankCallPending:false, shootout:null, winner:null,
-    log:[], _deck:[]
+    log:[], _deck:[], questionBank:QUESTIONS.slice(), usingCustom:false
   };
 }
 function pushLog(msg){
@@ -282,9 +242,80 @@ function pushLog(msg){
 }
 function pullQuestion(){
   if (!H._deck || H._deck.length === 0){
-    H._deck = shuffle(QUESTIONS.slice());
+    var bank = (H.questionBank && H.questionBank.length) ? H.questionBank : QUESTIONS;
+    H._deck = shuffle(bank.slice());
   }
   return H._deck.pop();
+}
+function parseCSVQuestions(text){
+  text = (text || '').replace(/\r\n/g,'\n').replace(/\r/g,'\n');
+  var rows = [];
+  var row = [];
+  var field = '';
+  var inQuotes = false;
+  var i = 0;
+  while (i < text.length){
+    var c = text[i];
+    if (inQuotes){
+      if (c === '"'){
+        if (text[i+1] === '"'){ field += '"'; i += 2; continue; }
+        inQuotes = false; i++; continue;
+      }
+      field += c; i++; continue;
+    } else {
+      if (c === '"'){ inQuotes = true; i++; continue; }
+      if (c === ','){ row.push(field); field = ''; i++; continue; }
+      if (c === '\n'){ row.push(field); rows.push(row); row = []; field = ''; i++; continue; }
+      field += c; i++; continue;
+    }
+  }
+  row.push(field);
+  rows.push(row);
+
+  var out = [];
+  rows.forEach(function(r, idx){
+    var q = (r[0] || '').trim();
+    var a = (r[1] || '').trim();
+    if (!q || !a) return;
+    if (idx === 0 && /^question$/i.test(q) && /^answer$/i.test(a)) return; // skip a header row
+    out.push([q, a]);
+  });
+  return out;
+}
+
+function parseCustomQuestions(text){
+  text = (text || '').trim();
+  if (!text) return [];
+  if (text[0] === '['){
+    try{
+      var arr = JSON.parse(text);
+      if (Array.isArray(arr)){
+        var fromJson = [];
+        arr.forEach(function(item){
+          if (Array.isArray(item) && item[0] && item[1]){
+            fromJson.push([String(item[0]).trim(), String(item[1]).trim()]);
+          } else if (item && typeof item === 'object'){
+            var q = item.q || item.question;
+            var a = item.a || item.answer;
+            if (q && a) fromJson.push([String(q).trim(), String(a).trim()]);
+          }
+        });
+        if (fromJson.length) return fromJson;
+      }
+    } catch(e){ /* not valid JSON, fall through to line parsing */ }
+  }
+  var lines = text.split('\n');
+  var out = [];
+  lines.forEach(function(line){
+    line = line.trim();
+    if (!line) return;
+    var idx = line.indexOf('|');
+    if (idx === -1) return;
+    var q = line.slice(0, idx).trim();
+    var a = line.slice(idx + 1).trim();
+    if (q && a) out.push([q, a]);
+  });
+  return out;
 }
 
 /* ============================== HOST NETWORKING ============================== */
@@ -294,6 +325,7 @@ function hostCreateRoom(durationSeconds){
   H.roundDuration = durationSeconds;
   H.timer.duration = durationSeconds;
   H.roomCode = genRoomCode();
+  customQuestionsDraft = ''; csvParsedQuestions = null; csvFileName = null; showQuestionBank = false;
   try{
     peer = new Peer('wlink-' + H.roomCode, {debug:0});
   } catch(e){
@@ -410,6 +442,48 @@ Actions.createRoom = function(){
 Actions.retryHost = function(){
   var dur = (H && H.roundDuration) || 60;
   hostCreateRoom(dur);
+};
+
+Actions.saveCustomQuestions = function(){
+  var ta = $('#customQuestions');
+  var parsed = parseCustomQuestions(ta ? ta.value : '');
+  if (parsed.length === 0){
+    alert('Could not find any valid questions.\n\nUse one per line, in the format:\nQuestion text | Answer text');
+    return;
+  }
+  H.questionBank = parsed;
+  H._deck = [];
+  H.usingCustom = true;
+  pushLog('Loaded ' + parsed.length + ' custom questions');
+  broadcastState(); render();
+};
+Actions.resetQuestions = function(){
+  H.questionBank = QUESTIONS.slice();
+  H._deck = [];
+  H.usingCustom = false;
+  customQuestionsDraft = '';
+  pushLog('Reset to the built-in question bank');
+  broadcastState(); render();
+};
+
+Actions.useCSVQuestions = function(){
+  if (!csvParsedQuestions || csvParsedQuestions.length === 0){
+    alert('No valid rows found in that file. Each row needs a question in the first column and an answer in the second.');
+    return;
+  }
+  H.questionBank = csvParsedQuestions;
+  H._deck = [];
+  H.usingCustom = true;
+  pushLog('Loaded ' + csvParsedQuestions.length + ' questions from ' + (csvFileName || 'a CSV file'));
+  csvParsedQuestions = null; csvFileName = null;
+  broadcastState(); render();
+};
+Actions.clearCSVPreview = function(){
+  csvParsedQuestions = null; csvFileName = null; render();
+};
+Actions.toggleQuestionBank = function(){
+  showQuestionBank = !showQuestionBank;
+  render();
 };
 
 Actions.startGame = function(){
@@ -616,8 +690,10 @@ function declareShootoutWinner(idx){
 Actions.playAgain = function(){
   var oldPlayers = H.players.map(function(p){ return {id:p.id,name:p.name,alive:true,correct:0,incorrect:0,connected:p.connected}; });
   var dur = H.roundDuration, code = H.roomCode, ready = H.ready;
+  var qBank = H.questionBank, usingCustom = H.usingCustom;
   H = newHostState();
   H.roundDuration = dur; H.roomCode = code; H.ready = ready; H.players = oldPlayers;
+  H.questionBank = qBank; H.usingCustom = usingCustom;
   broadcastState(); render();
 };
 
@@ -638,7 +714,7 @@ Actions.joinRoom = function(){
     var conn = peer.connect('wlink-' + code, {reliable:true});
     P.conn = conn;
     conn.on('open', function(){
-      conn.send({type:'join', name:name, rejoinId: localStorage.getItem('wlink_' + code)});
+      conn.send({type:'join', name:name, rejoinId: sessionStorage.getItem('wlink_' + code)});
     });
     conn.on('data', function(d){ handleHostMessage(d); });
     conn.on('close', function(){ P.connLost = true; render(); });
@@ -657,7 +733,7 @@ Actions.retryJoin = function(){ localView = 'playerSetup'; role = null; P = {con
 function handleHostMessage(msg){
   if (msg.type === 'welcome'){
     P.myId = msg.playerId;
-    localStorage.setItem('wlink_' + P.roomCode, msg.playerId);
+    sessionStorage.setItem('wlink_' + P.roomCode, msg.playerId);
     P.denied = null;
     render();
   } else if (msg.type === 'state'){
@@ -770,7 +846,12 @@ function topBarHtml(extraChips){
     chips += '<span class="stat-chip timer'+(low?' low':'')+'"><b>'+remain+'</b>Time left</span>';
     chips += '<span class="stat-chip"><b>'+H.round+'</b>Round</span>';
   }
-  return '<div class="top-bar"><div class="room-pill">ROOM '+esc(H.roomCode)+'</div><div class="stat-strip">'+chips+(extraChips||'')+'</div></div>';
+  chips += '<button class="stat-chip" style="cursor:pointer;" data-action="toggleQuestionBank">'+(showQuestionBank?'Hide':'View')+' bank ('+H.questionBank.length+')</button>';
+  var bar = '<div class="top-bar"><div class="room-pill">ROOM '+esc(H.roomCode)+'</div><div class="stat-strip">'+chips+(extraChips||'')+'</div></div>';
+  if (showQuestionBank){
+    bar += '<div class="panel qbank-panel" style="margin:0 22px 16px;"><h3>Question bank \u2014 '+H.questionBank.length+' questions</h3>'+questionListHtml()+'</div>';
+  }
+  return bar;
 }
 
 function hostLobbyView(){
@@ -783,7 +864,51 @@ function hostLobbyView(){
     '<p style="color:var(--muted);">Have everyone go to this page and tap <b style="color:var(--text);">Join a game</b>, then enter this code:</p>' +
     '<h1 class="display" style="font-size:64px;letter-spacing:10px;color:var(--gold);margin:6px 0 24px;">'+esc(H.roomCode)+'</h1>' +
     '<div class="panel" style="text-align:left;"><h3>Players</h3><div class="roster">'+list+'</div></div>' +
+    questionBankPanel() +
     '<button class="big-btn gold full-btn" data-action="startGame" style="max-width:320px;">Start game ('+H.players.length+' joined, need 3+)</button>' +
+  '</div>';
+}
+
+function questionListHtml(){
+  return '<div class="qbank-list">' + H.questionBank.map(function(pair,i){
+    return '<div class="qbank-row"><span class="qbank-num">'+(i+1)+'.</span>' +
+      '<div><div class="qbank-q">'+esc(pair[0])+'</div><div class="qbank-a">'+esc(pair[1])+'</div></div></div>';
+  }).join('') + '</div>';
+}
+function questionBankPanel(){
+  var statusLine = H.usingCustom
+    ? '<span style="color:var(--gold);">Using '+H.questionBank.length+' custom question'+(H.questionBank.length===1?'':'s')+'</span>'
+    : '<span style="color:var(--muted);">Using the '+H.questionBank.length+' built-in questions</span>';
+  var draftValue = customQuestionsDraft || (H.usingCustom ? H.questionBank.map(function(pair){return pair[0]+' | '+pair[1];}).join('\n') : '');
+
+  var csvSection;
+  if (csvParsedQuestions){
+    csvSection = '<div style="margin-top:10px;font-size:13px;color:var(--gold);">Found '+csvParsedQuestions.length+' question'+(csvParsedQuestions.length===1?'':'s')+' in '+esc(csvFileName)+'</div>' +
+      '<div class="action-row" style="justify-content:flex-start;margin-top:8px;">' +
+        '<button class="act-btn primary" data-action="useCSVQuestions">Use these '+csvParsedQuestions.length+' questions</button>' +
+        '<button class="act-btn neutral" data-action="clearCSVPreview">Cancel</button>' +
+      '</div>';
+  } else {
+    csvSection = '';
+  }
+
+  return '<div class="panel" style="text-align:left;margin-top:14px;">' +
+    '<h3>Question bank</h3>' +
+    '<p style="font-size:13px;color:var(--muted);margin:0 0 10px;">'+statusLine+
+      ' &middot; <button class="back-link" style="display:inline;padding:0;font-size:13px;color:var(--blue);" data-action="toggleQuestionBank">'+(showQuestionBank?'Hide list':'View all questions')+'</button></p>' +
+    (showQuestionBank ? questionListHtml() : '') +
+    '<p style="font-size:12px;color:var(--muted);margin:14px 0 6px;">Paste your own, one per line: <code style="color:var(--text);">Question text | Answer text</code></p>' +
+    '<textarea id="customQuestions" rows="5" placeholder="What is the capital of France? | Paris\nHow many legs does a spider have? | Eight" ' +
+      'style="width:100%;padding:12px 14px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--text);font-size:14px;font-family:Inter,sans-serif;resize:vertical;">'+esc(draftValue)+'</textarea>' +
+    '<div class="action-row" style="justify-content:flex-start;margin-top:10px;">' +
+      '<button class="act-btn primary" data-action="saveCustomQuestions">Use these questions</button>' +
+      (H.usingCustom ? '<button class="act-btn neutral" data-action="resetQuestions">Reset to built-in</button>' : '') +
+    '</div>' +
+    '<div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--line);">' +
+      '<p style="font-size:12px;color:var(--muted);margin:0 0 8px;">Or upload a CSV file with two columns: question, answer</p>' +
+      '<input type="file" id="csvFileInput" accept=".csv,text/csv" style="color:var(--text);font-size:13px;">' +
+      csvSection +
+    '</div>' +
   '</div>';
 }
 
@@ -1041,6 +1166,27 @@ function render(){
   $('#app').innerHTML = html;
 }
 
+document.addEventListener('input', function(e){
+  if (e.target && e.target.id === 'customQuestions') customQuestionsDraft = e.target.value;
+});
+document.addEventListener('change', function(e){
+  if (!e.target || e.target.id !== 'csvFileInput') return;
+  var file = e.target.files && e.target.files[0];
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(ev){
+    var parsed = parseCSVQuestions(ev.target.result);
+    csvParsedQuestions = parsed;
+    csvFileName = file.name;
+    render();
+  };
+  reader.onerror = function(){
+    csvParsedQuestions = null; csvFileName = null;
+    alert('Could not read that file. Make sure it\'s a plain .csv file.');
+    render();
+  };
+  reader.readAsText(file);
+});
 document.addEventListener('click', function(e){
   var el = e.target.closest('[data-action]');
   if (!el) return;
