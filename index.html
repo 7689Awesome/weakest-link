@@ -33,18 +33,19 @@ body{
 }
 h1,h2,h3,.display{font-family:'Oswald',sans-serif;}
 button{font-family:'Inter',sans-serif;cursor:pointer;border:none;}
-input,select{font-family:'Inter',sans-serif;}
+input,select,textarea{font-family:'Inter',sans-serif;}
 #app{min-height:100vh;display:flex;flex-direction:column;}
 
 /* ---------- Landing ---------- */
 .landing{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:32px;text-align:center;}
 .landing .brand{font-family:'Oswald',sans-serif;font-weight:600;font-size:clamp(40px,9vw,72px);letter-spacing:0.5px;margin:0;line-height:1;background:linear-gradient(180deg,#fff, var(--gold) 140%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;}
 .landing .brand span{color:var(--gold);-webkit-text-fill-color:var(--gold);}
-.landing .tag{color:var(--muted);font-size:16px;margin:10px 0 40px;max-width:420px;}
+.landing .tag{color:var(--muted);font-size:16px;margin:10px 0 40px;max-width:440px;}
 .landing-btns{display:flex;gap:16px;flex-wrap:wrap;justify-content:center;}
 .big-btn{padding:18px 34px;border-radius:12px;font-size:17px;font-weight:600;min-width:200px;transition:transform .15s ease;}
 .big-btn:active{transform:scale(0.97);}
 .big-btn.gold{background:linear-gradient(180deg,#f3c463,var(--gold));color:#20150a;}
+.big-btn.gold:disabled{background:var(--panel-2);color:var(--muted);cursor:not-allowed;}
 .big-btn.ghost{background:var(--panel-2);color:var(--text);border:1px solid var(--line);}
 .setup-card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:28px;max-width:400px;width:100%;text-align:left;}
 .setup-card label{display:block;font-size:13px;color:var(--muted);margin:16px 0 6px;}
@@ -54,59 +55,62 @@ input,select{font-family:'Inter',sans-serif;}
 .error-box{background:rgba(229,72,77,0.12);border:1px solid var(--red);color:#ffb3b5;padding:14px 16px;border-radius:10px;margin:14px 0;font-size:14px;text-align:left;}
 
 /* ---------- Generic layout ---------- */
-.top-bar{display:flex;align-items:center;justify-content:space-between;padding:14px 22px;border-bottom:1px solid var(--line);flex-wrap:wrap;gap:10px;}
-.top-bar .room-pill{background:var(--panel-2);border:1px solid var(--gold-dim);color:var(--gold);font-family:'Oswald',sans-serif;font-size:15px;padding:6px 14px;border-radius:20px;letter-spacing:2px;}
-.stat-strip{display:flex;gap:10px;flex-wrap:wrap;}
-.stat-chip{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 14px;font-size:13px;color:var(--muted);}
-.stat-chip b{color:var(--text);font-family:'Oswald',sans-serif;font-size:16px;display:block;}
+.main-compact{max-width:760px;margin:0 auto;width:100%;padding:10px 18px 26px;}
+.ctrl-wrap{max-width:520px;margin:0 auto;width:100%;padding:12px 16px 26px;}
+.top-bar{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--line);flex-wrap:wrap;gap:10px;margin-bottom:10px;}
+.top-bar .room-pill{background:var(--panel-2);border:1px solid var(--gold-dim);color:var(--gold);font-family:'Oswald',sans-serif;font-size:14px;padding:5px 12px;border-radius:20px;letter-spacing:2px;}
+.stat-strip{display:flex;gap:8px;flex-wrap:wrap;}
+.stat-chip{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:6px 12px;font-size:12px;color:var(--muted);}
+.stat-chip b{color:var(--text);font-family:'Oswald',sans-serif;font-size:15px;display:block;}
 .stat-chip.gold b{color:var(--gold);}
-.stat-chip.timer b{color:var(--blue);}
-.stat-chip.timer.low b{color:var(--red);}
-.main-grid{display:grid;grid-template-columns:220px 1fr 260px;gap:16px;padding:16px 22px;flex:1;}
-.main-grid.two-col{grid-template-columns:260px 1fr;}
-@media (max-width:980px){.main-grid, .main-grid.two-col{grid-template-columns:1fr;}}
-.panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:16px;}
-.panel h3{margin:0 0 12px;font-size:14px;font-weight:500;color:var(--muted);text-transform:none;letter-spacing:0.3px;}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;margin-bottom:12px;}
+.panel h3{margin:0 0 10px;font-size:13px;font-weight:500;color:var(--muted);letter-spacing:0.3px;}
 
-/* chain ladder */
-.ladder{display:flex;flex-direction:column-reverse;gap:4px;}
-.rung{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-radius:8px;background:var(--panel-2);color:var(--muted);font-family:'Oswald',sans-serif;font-size:15px;border-left:3px solid transparent;transition:.2s;}
-.rung.climbed{background:rgba(232,178,61,0.10);color:#e0c98a;border-left-color:var(--gold-dim);}
-.rung.current{background:linear-gradient(90deg,rgba(232,178,61,0.25),rgba(232,178,61,0.08));color:var(--gold);border-left-color:var(--gold);font-size:19px;font-weight:600;}
-.bank-total{margin-top:14px;text-align:center;padding:14px;border-radius:10px;background:var(--panel-2);}
-.bank-total .amt{font-family:'Oswald',sans-serif;font-size:30px;color:var(--gold);}
-.bank-total .lbl{font-size:12px;color:var(--muted);}
+/* big shared timer */
+.big-timer{font-family:'Oswald',sans-serif;font-size:clamp(46px,11vw,68px);text-align:center;color:var(--blue);line-height:1;margin:2px 0 12px;font-variant-numeric:tabular-nums;}
+.big-timer.low{color:var(--red);}
 
-/* stage */
-.stage{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;min-height:260px;}
-.stage .q-label{font-size:13px;color:var(--muted);margin-bottom:10px;}
-.stage .q-text{font-size:clamp(20px,3vw,30px);font-weight:600;line-height:1.3;max-width:560px;}
-.stage .a-text{margin-top:18px;font-family:'Oswald',sans-serif;font-size:22px;color:var(--green);}
-.stage .asked-who{font-size:15px;color:var(--blue);margin-top:10px;}
-.action-row{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:22px;}
-.act-btn{padding:16px 26px;border-radius:10px;font-size:16px;font-weight:600;}
+/* compact horizontal chain ladder (used everywhere) */
+.ladder-h{display:flex;gap:5px;flex-wrap:wrap;justify-content:center;margin:8px 0;}
+.rung-h{padding:5px 9px;border-radius:6px;background:var(--panel-2);color:var(--muted);font-family:'Oswald',sans-serif;font-size:12px;transition:.2s;}
+.rung-h.climbed{background:rgba(232,178,61,0.14);color:#e0c98a;}
+.rung-h.current{background:linear-gradient(180deg,#f3c463,var(--gold));color:#20150a;font-size:15px;font-weight:700;padding:6px 13px;}
+.bank-total{margin-top:10px;text-align:center;padding:12px;border-radius:10px;background:var(--panel-2);}
+.bank-total .amt{font-family:'Oswald',sans-serif;font-size:26px;color:var(--gold);}
+.bank-total .lbl{font-size:11px;color:var(--muted);}
+
+/* stage / question display */
+.stage{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;}
+.stage.compact{padding:6px 0 4px;}
+.stage .q-label{font-size:12px;color:var(--muted);margin-bottom:8px;}
+.stage .q-text{font-size:clamp(20px,3vw,30px);font-weight:600;line-height:1.3;max-width:560px;margin:0 auto;}
+.stage .a-text{margin-top:14px;font-family:'Oswald',sans-serif;font-size:20px;color:var(--green);text-align:center;}
+.ctrl-asked{font-family:'Oswald',sans-serif;font-size:clamp(20px,3vw,30px);font-weight:600;text-align:center;margin-bottom:10px;}
+.action-row{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:16px;}
+.act-btn{padding:14px 22px;border-radius:10px;font-size:15px;font-weight:600;}
 .act-btn.correct{background:var(--green);color:#06210f;}
 .act-btn.incorrect{background:var(--red);color:#2a0709;}
 .act-btn.primary{background:var(--blue);color:#06122a;}
 .act-btn.bank{background:linear-gradient(180deg,#f3c463,var(--gold));color:#20150a;}
 .act-btn.neutral{background:var(--panel-2);color:var(--text);border:1px solid var(--line);}
 .act-btn:disabled{opacity:0.35;cursor:not-allowed;}
+.full-btn{width:100%;padding:15px;border-radius:12px;font-size:15px;font-weight:600;margin-top:8px;}
 
-/* roster */
+/* roster / chips */
 .roster{display:flex;flex-direction:column;gap:8px;}
-.chip{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-radius:10px;background:var(--panel-2);border:1px solid transparent;font-size:14px;}
+.chip{display:flex;align-items:center;justify-content:space-between;padding:9px 12px;border-radius:10px;background:var(--panel-2);border:1px solid transparent;font-size:13px;gap:8px;}
 .chip.selected{border-color:var(--blue);background:rgba(79,143,247,0.12);}
-.chip.dead{opacity:0.4;text-decoration:line-through;}
-.chip .nm{font-weight:600;}
 .chip .sub{font-size:11px;color:var(--muted);}
-.dot{width:8px;height:8px;border-radius:50%;background:var(--green);display:inline-block;margin-right:6px;}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--green);display:inline-block;margin-right:6px;}
 .dot.off{background:var(--muted);}
+.kick-btn{background:none;color:var(--muted);font-size:15px;padding:2px 8px;border-radius:6px;}
+.kick-btn:active{color:var(--red);}
 
-.log{margin-top:14px;font-size:12px;color:var(--muted);display:flex;flex-direction:column;gap:6px;max-height:140px;overflow-y:auto;}
+.log{margin-top:12px;font-size:11px;color:var(--muted);display:flex;flex-direction:column;gap:5px;max-height:120px;overflow-y:auto;}
 .banner{background:rgba(232,178,61,0.15);border:1px solid var(--gold-dim);color:var(--gold);padding:10px 14px;border-radius:10px;font-size:14px;margin-bottom:12px;text-align:center;}
 
 /* question bank viewer */
-.qbank-list{max-height:320px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;padding-right:4px;margin-top:10px;}
+.qbank-list{max-height:280px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;padding-right:4px;margin-top:10px;}
 .qbank-row{display:flex;gap:10px;background:var(--panel-2);padding:8px 10px;border-radius:8px;font-size:13px;}
 .qbank-num{color:var(--muted);min-width:28px;}
 .qbank-q{color:var(--text);}
@@ -119,70 +123,57 @@ input,select{font-family:'Inter',sans-serif;}
 .vote-row .no{color:var(--muted);}
 
 /* elimination */
-.elim-card{text-align:center;padding:30px;}
-.elim-card .name{font-family:'Oswald',sans-serif;font-size:38px;color:var(--red);margin:10px 0;}
-.tally{display:flex;flex-direction:column;gap:6px;max-width:340px;margin:18px auto;}
+.elim-card{text-align:center;padding:22px;}
+.elim-card .name{font-family:'Oswald',sans-serif;font-size:34px;color:var(--red);margin:10px 0;}
+.tally{display:flex;flex-direction:column;gap:6px;max-width:340px;margin:16px auto;}
 .tally .r{display:flex;justify-content:space-between;background:var(--panel-2);padding:8px 12px;border-radius:8px;font-size:14px;}
 
 /* shootout */
-.duel{display:flex;justify-content:center;gap:40px;flex-wrap:wrap;margin:20px 0;}
+.duel{display:flex;justify-content:center;gap:34px;flex-wrap:wrap;margin:14px 0;}
 .duel-side{text-align:center;padding:10px 16px;border-radius:10px;transition:.2s;}
-.duel-side .nm{font-family:'Oswald',sans-serif;font-size:22px;}
+.duel-side .nm{font-family:'Oswald',sans-serif;font-size:20px;}
 .duel-side.active{box-shadow:0 0 0 2px var(--gold-dim),0 0 30px 6px rgba(232,178,61,0.35);background:rgba(232,178,61,0.06);}
 .duel-side.active .nm{color:var(--gold);}
 .kicks{display:flex;gap:6px;justify-content:center;margin-top:10px;}
-.kick{width:26px;height:26px;border-radius:50%;background:var(--panel-2);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:14px;}
+.kick{width:24px;height:24px;border-radius:50%;background:var(--panel-2);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:13px;}
 .kick.hit{background:var(--green);color:#06210f;border-color:var(--green);}
 .kick.miss{background:var(--red);color:#2a0709;border-color:var(--red);}
 
-/* podiums */
-.podium-row{display:flex;gap:14px;flex-wrap:wrap;justify-content:center;padding:18px 22px 4px;}
-.podium{position:relative;display:flex;flex-direction:column;align-items:center;padding:14px 16px 0;min-width:100px;animation:podiumIn .3s ease;}
+/* podiums (audience-facing main screen) */
+.podium-row{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;padding:10px 0 4px;}
+.podium{position:relative;display:flex;flex-direction:column;align-items:center;padding:10px 14px 0;min-width:88px;animation:podiumIn .3s ease;}
 @keyframes podiumIn{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
-.podium-name{font-family:'Oswald',sans-serif;font-size:16px;white-space:nowrap;z-index:2;}
+.podium-name{font-family:'Oswald',sans-serif;font-size:15px;white-space:nowrap;z-index:2;}
 .podium-acc{font-size:11px;color:var(--muted);margin-top:2px;z-index:2;}
-.podium-base{width:100%;height:14px;margin-top:10px;background:linear-gradient(180deg,var(--panel-2),var(--line));border-radius:4px 4px 0 0;border-top:2px solid var(--line);}
-.podium.dead{opacity:0.35;}
-.podium.spotlight .podium-name{color:var(--gold);font-size:19px;}
+.podium-base{width:100%;height:12px;margin-top:8px;background:linear-gradient(180deg,var(--panel-2),var(--line));border-radius:4px 4px 0 0;border-top:2px solid var(--line);}
+.podium.spotlight .podium-name{color:var(--gold);font-size:18px;}
 .podium.spotlight .podium-base{background:linear-gradient(180deg,#3a2f10,var(--gold-dim));border-top-color:var(--gold);}
 .podium.spotlight{box-shadow:0 0 0 1px var(--gold-dim);border-radius:10px;}
-.spotlight-beam{position:absolute;top:-30px;left:50%;width:90px;height:90px;transform:translateX(-50%);background:radial-gradient(ellipse at top, rgba(232,178,61,0.45), transparent 70%);pointer-events:none;z-index:1;}
-.podium.selectable{cursor:pointer;}
+.spotlight-beam{position:absolute;top:-26px;left:50%;width:80px;height:80px;transform:translateX(-50%);background:radial-gradient(ellipse at top, rgba(232,178,61,0.45), transparent 70%);pointer-events:none;z-index:1;}
 
 /* keyboard hint */
 .kbd{display:inline-block;margin-left:8px;padding:1px 7px;border-radius:4px;background:rgba(0,0,0,0.28);font-size:11px;font-family:monospace;letter-spacing:0.5px;}
 
-/* answer view (second screen) */
-.av-wrap{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:30px;background:#05070d;}
-.av-label{color:var(--muted);font-size:14px;margin-bottom:10px;}
-.av-question{font-size:clamp(20px,4vw,30px);font-weight:600;max-width:700px;margin-bottom:20px;}
-.av-answer{font-family:'Oswald',sans-serif;color:var(--green);font-size:clamp(36px,7vw,64px);line-height:1.1;}
-.av-turn{color:var(--blue);font-family:'Oswald',sans-serif;font-size:28px;margin-top:10px;}
-
 /* game over */
-.gameover{text-align:center;padding:40px 20px;}
-.gameover .trophy{font-size:64px;}
-.gameover .winner{font-family:'Oswald',sans-serif;font-size:44px;color:var(--gold);margin:6px 0 24px;}
+.gameover{text-align:center;padding:30px 20px;}
+.gameover .trophy{font-size:56px;}
+.gameover .winner{font-family:'Oswald',sans-serif;font-size:38px;color:var(--gold);margin:6px 0 6px;}
 .standings{max-width:360px;margin:0 auto;display:flex;flex-direction:column;gap:6px;}
 .standings .r{display:flex;justify-content:space-between;background:var(--panel-2);padding:9px 14px;border-radius:8px;font-size:14px;}
 
 /* player screen */
 .player-wrap{max-width:520px;margin:0 auto;width:100%;padding:16px;}
-.p-header{text-align:center;margin-bottom:14px;}
+.p-header{text-align:center;margin-bottom:12px;}
 .p-header .rc{color:var(--gold);font-family:'Oswald',sans-serif;letter-spacing:3px;font-size:14px;}
-.p-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px;}
+.p-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px;}
 .p-stat{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px;text-align:center;}
 .p-stat b{display:block;font-family:'Oswald',sans-serif;font-size:22px;}
 .p-stat span{font-size:11px;color:var(--muted);}
 .turn-flag{text-align:center;padding:16px;border-radius:12px;font-size:17px;font-weight:700;margin-bottom:14px;}
 .turn-flag.yours{background:rgba(232,178,61,0.18);color:var(--gold);border:1px solid var(--gold-dim);}
 .turn-flag.theirs{background:var(--panel-2);color:var(--muted);border:1px solid var(--line);}
-.center-msg{text-align:center;color:var(--muted);padding:40px 20px;font-size:15px;}
+.center-msg{text-align:center;color:var(--muted);padding:30px 20px;font-size:15px;}
 .spectator-tag{background:var(--panel-2);color:var(--muted);text-align:center;padding:10px;border-radius:10px;margin-bottom:14px;font-size:13px;}
-.full-btn{width:100%;padding:16px;border-radius:12px;font-size:16px;font-weight:600;margin-top:10px;}
-.timer-ring{width:90px;height:90px;border-radius:50%;border:6px solid var(--panel-2);display:flex;align-items:center;justify-content:center;margin:0 auto 14px;font-family:'Oswald',sans-serif;font-size:26px;border-top-color:var(--blue);}
-.timer-ring.low{border-top-color:var(--red);color:var(--red);}
-select.vote-select{width:100%;padding:14px;border-radius:10px;background:var(--panel-2);color:var(--text);border:1px solid var(--line);font-size:16px;margin-bottom:12px;}
 .footer-note{text-align:center;color:var(--muted);font-size:11px;padding:14px;}
 </style>
 </head>
@@ -232,27 +223,27 @@ function fmtClock(ms){
 }
 
 /* ============================== GLOBAL STATE ============================== */
-var role = null;          // null | 'host' | 'player'
-var localView = 'landing'; // 'landing' | 'hostSetup' | 'playerSetup'
+var role = null;          // null | 'host' (main screen) | 'controller' | 'player'
+var localView = 'landing'; // 'landing' | 'hostSetup' | 'playerSetup' | 'controllerSetup'
 var peer = null;
 
-var H = null;              // host authoritative state
+var H = null;              // host authoritative state (the main-screen device)
 var hostConns = {};        // playerId -> DataConnection
-var hostAnswerConns = [];  // DataConnections for connected answer-view (2nd screen) devices
-var customQuestionsDraft = ''; // mirrors the #customQuestions textarea across re-renders
-var csvParsedQuestions = null; // [q,a] pairs parsed from an uploaded CSV, pending confirmation
-var csvFileName = null;
-var showQuestionBank = false; // toggles the full question-bank viewer
+var hostControllerConns = []; // DataConnections for connected controller device(s)
 
 var P = {                  // player-side local wrapper
   conn: null, roomCode: '', myName: '', myId: null,
   state: null, error: null, denied: null, connLost: false,
-  localVoted: false, bankFlash: false
+  localVoted: false, bankFlash: false, renameError: null
 };
 
-var AV = {                 // answer-view (2nd screen) local wrapper
-  conn: null, roomCode: '', state: null, error: null, connLost: false
+var CTRL = {                // controller-side local wrapper (no authoritative state, just a mirror)
+  conn: null, roomCode: '', state: null, error: null, connLost: false, questionBankCache: null
 };
+var ctrlQuestionsDraft = ''; // mirrors the controller's custom-question textarea across re-renders
+var ctrlCsvParsedQuestions = null;
+var ctrlCsvFileName = null;
+var ctrlShowQuestionBank = false;
 
 /* ============================== HOST STATE ============================== */
 function newHostState(){
@@ -314,7 +305,6 @@ function parseCSVQuestions(text){
   });
   return out;
 }
-
 function parseCustomQuestions(text){
   text = (text || '').trim();
   if (!text) return [];
@@ -357,8 +347,7 @@ function hostCreateRoom(durationSeconds){
   H.roundDuration = durationSeconds;
   H.timer.duration = durationSeconds;
   H.roomCode = genRoomCode();
-  hostConns = {}; hostAnswerConns = [];
-  customQuestionsDraft = ''; csvParsedQuestions = null; csvFileName = null; showQuestionBank = false;
+  hostConns = {}; hostControllerConns = [];
   try{
     peer = new Peer('wlink-' + H.roomCode, {debug:0});
   } catch(e){
@@ -368,7 +357,7 @@ function hostCreateRoom(durationSeconds){
   }
   peer.on('open', function(){ H.ready = true; render(); });
   peer.on('connection', function(conn){
-    conn.on('data', function(data){ handlePlayerMessage(conn, data); });
+    conn.on('data', function(data){ handleIncomingHostMessage(conn, data); });
     conn.on('close', function(){ handleHostSideDisconnect(conn); });
   });
   peer.on('disconnected', function(){ try{ peer.reconnect(); }catch(e){} });
@@ -381,42 +370,67 @@ function hostCreateRoom(durationSeconds){
   render();
 }
 
-function handlePlayerMessage(conn, msg){
+function handleIncomingHostMessage(conn, msg){
   if (!H) return;
-  if (msg.type === 'joinAnswerView'){
-    if (hostAnswerConns.indexOf(conn) === -1) hostAnswerConns.push(conn);
-    conn.send({type:'welcomeAnswerView', roomCode:H.roomCode});
-    conn.send({type:'answerState', state: sanitizeForAnswerView()});
+
+  if (msg.type === 'joinController'){
+    if (hostControllerConns.indexOf(conn) === -1) hostControllerConns.push(conn);
+    conn.send({type:'welcomeController', roomCode:H.roomCode});
+    conn.send({type:'controllerState', state: sanitizeForController()});
     return;
   }
+
+  if (msg.type === 'control'){
+    if (hostControllerConns.indexOf(conn) === -1) return; // only accept control messages from a registered controller
+    var fn = CONTROL_ACTIONS[msg.action];
+    if (fn) fn(msg.arg, conn);
+    return;
+  }
+
   if (msg.type === 'join'){
+    var incomingName = (msg.name || 'Player').toString().trim().slice(0,18) || 'Player';
     var p = null;
     if (msg.rejoinId){
-      p = H.players.filter(function(pl){ return pl.id === msg.rejoinId; })[0];
+      p = H.players.filter(function(pl){ return pl.id === msg.rejoinId; })[0] || null;
     }
-    if (!p && H.phase === 'lobby'){
-      var name = (msg.name || 'Player').slice(0,18);
-      var finalName = name, n = 2;
-      while (H.players.some(function(pl){ return pl.name.toLowerCase() === finalName.toLowerCase(); })){
-        finalName = name + ' ' + n; n++;
-      }
-      p = {id:uid(), name:finalName, alive:true, correct:0, incorrect:0, connected:true};
-      H.players.push(p);
-    } else if (p){
+    if (!p){
+      // No session id (new device/session) but the name matches someone currently OFFLINE:
+      // treat this as that player reconnecting and keep all their stats/alive status.
+      p = H.players.filter(function(pl){
+        return pl.connected === false && pl.name.toLowerCase() === incomingName.toLowerCase();
+      })[0] || null;
+    }
+    if (p){
+      var wasOffline = !p.connected;
       p.connected = true;
-    } else {
+      hostConns[p.id] = conn;
+      conn.send({type:'welcome', playerId:p.id, roomCode:H.roomCode});
+      pushLog(p.name + (wasOffline ? ' reconnected' : ' joined'));
+      broadcastState(); render();
+      return;
+    }
+    if (H.phase !== 'lobby'){
       conn.send({type:'denied', reason:'The game is already in progress. Ask the host to start a new room.'});
       return;
     }
-    hostConns[p.id] = conn;
-    conn.send({type:'welcome', playerId:p.id, roomCode:H.roomCode});
-    pushLog(p.name + ' joined');
+    var finalName = incomingName, n = 2;
+    while (H.players.some(function(pl){ return pl.name.toLowerCase() === finalName.toLowerCase(); })){
+      finalName = incomingName + ' ' + n; n++;
+    }
+    var np = {id:uid(), name:finalName, alive:true, correct:0, incorrect:0, connected:true};
+    H.players.push(np);
+    hostConns[np.id] = conn;
+    conn.send({type:'welcome', playerId:np.id, roomCode:H.roomCode});
+    pushLog(np.name + ' joined');
     broadcastState(); render();
     return;
   }
+
+  // Remaining message types require an already-known connected player
   var player = null;
   for (var pid in hostConns){ if (hostConns[pid] === conn) player = H.players.filter(function(pl){return pl.id===pid;})[0]; }
   if (!player) return;
+
   if (msg.type === 'vote'){
     if (H.phase !== 'voting' || !player.alive) return;
     H.votes[player.id] = msg.targetId;
@@ -425,24 +439,42 @@ function handlePlayerMessage(conn, msg){
     if (H.phase === 'playing' && H.currentAskedId === player.id){
       H.bankCallPending = true;
       pushLog('\uD83D\uDD14 ' + player.name + ' wants to bank!');
-      render();
+      broadcastState(); render();
     }
+  } else if (msg.type === 'rename'){
+    if (H.phase !== 'lobby') return;
+    var newName = (msg.newName || '').toString().trim().slice(0,18);
+    if (!newName) return;
+    var conflict = H.players.some(function(pl){ return pl.id !== player.id && pl.name.toLowerCase() === newName.toLowerCase(); });
+    if (conflict){ conn.send({type:'renameFailed', reason:'That name is taken.'}); return; }
+    var oldName = player.name;
+    player.name = newName;
+    pushLog(oldName + ' renamed themselves to ' + newName);
+    broadcastState(); render();
   }
 }
 
 function handleHostSideDisconnect(conn){
-  var avIdx = hostAnswerConns.indexOf(conn);
-  if (avIdx !== -1){ hostAnswerConns.splice(avIdx, 1); return; }
+  var idx = hostControllerConns.indexOf(conn);
+  if (idx !== -1){ hostControllerConns.splice(idx, 1); return; }
   var player = null;
   for (var pid in hostConns){ if (hostConns[pid] === conn) player = H.players.filter(function(pl){return pl.id===pid;})[0]; }
   if (player){ player.connected = false; pushLog(player.name + ' disconnected'); broadcastState(); render(); }
 }
 
-function sanitizeShootout(s){
+function sanitizeShootout(s){ // player-facing: no answers
   return {
     order: s.order.map(function(id){ return {id:id, name:(H.players.filter(function(p){return p.id===id;})[0]||{}).name}; }),
     rounds: s.rounds, currentRoundIndex: s.currentRoundIndex, currentTurn: s.currentTurn,
     sudden: s.sudden, winnerId: s.winnerId
+  };
+}
+function sanitizeShootoutForController(s){ // controller-facing: includes answers
+  return {
+    order: s.order.map(function(id){ return {id:id, name:(H.players.filter(function(p){return p.id===id;})[0]||{}).name}; }),
+    rounds: s.rounds, currentRoundIndex: s.currentRoundIndex, currentTurn: s.currentTurn,
+    sudden: s.sudden, winnerId: s.winnerId,
+    currentQuestion: s.currentQuestion ? {q:s.currentQuestion[0], a:s.currentQuestion[1]} : null
   };
 }
 function sanitizeForPlayer(forPlayer){
@@ -475,24 +507,32 @@ function sanitizeForPlayer(forPlayer){
     winner: H.winner || null
   };
 }
-function sanitizeShootoutForAnswerView(s){
-  return {
-    order: s.order.map(function(id){ return {id:id, name:(H.players.filter(function(p){return p.id===id;})[0]||{}).name}; }),
-    currentTurn: s.currentTurn, sudden: s.sudden, winnerId: s.winnerId,
-    currentQuestion: s.currentQuestion ? {q:s.currentQuestion[0], a:s.currentQuestion[1]} : null
-  };
-}
-function sanitizeForAnswerView(){
+function sanitizeForController(){
   var askedPlayer = H.players.filter(function(p){return p.id===H.currentAskedId;})[0];
+  var revealInfo = null;
+  if (H.revealing && H.revealOrder){
+    var targetId = H.revealOrder[H.revealIndex];
+    var voter = H.players.filter(function(p){return p.id===targetId;})[0];
+    var votedForId = H.votes[targetId];
+    var votedFor = votedForId ? H.players.filter(function(p){return p.id===votedForId;})[0] : null;
+    revealInfo = { voterName: voter?voter.name:'', votedForName: votedFor?votedFor.name:null, index:H.revealIndex, total:H.revealOrder.length };
+  }
   return {
     phase: H.phase, roomCode: H.roomCode, round: H.round,
-    bank: H.bank, chainIndex: H.chainIndex,
-    askedName: askedPlayer ? askedPlayer.name : null,
-    bankCallPending: H.bankCallPending,
+    players: H.players.map(function(p){ return {id:p.id,name:p.name,alive:p.alive,correct:p.correct,incorrect:p.incorrect,connected:p.connected}; }),
+    chainIndex: H.chainIndex, chainValue: H.chainIndex>=0?CHAIN_VALUES[H.chainIndex]:0, bank: H.bank,
+    currentAskedId: H.currentAskedId, askedName: askedPlayer?askedPlayer.name:null,
     currentQuestion: H.currentQuestion ? {q:H.currentQuestion[0], a:H.currentQuestion[1]} : null,
+    timer: H.timer,
+    bankCallPending: H.bankCallPending,
+    votedCount: Object.keys(H.votes).length,
+    revealing: H.revealing, revealOrder: H.revealOrder, revealIndex: H.revealIndex, revealInfo: revealInfo,
+    tieCandidates: H.tieCandidates,
     lastElimination: H.lastElimination,
-    shootout: H.shootout ? sanitizeShootoutForAnswerView(H.shootout) : null,
-    winner: H.winner || null
+    shootout: H.shootout ? sanitizeShootoutForController(H.shootout) : null,
+    winner: H.winner || null,
+    questionBankCount: H.questionBank.length, usingCustom: H.usingCustom,
+    log: H.log
   };
 }
 function broadcastState(){
@@ -501,81 +541,35 @@ function broadcastState(){
     if (!conn || !conn.open) return;
     conn.send({type:'state', state: sanitizeForPlayer(p)});
   });
-  hostAnswerConns.forEach(function(conn){
+  hostControllerConns.forEach(function(conn){
     if (!conn || !conn.open) return;
-    conn.send({type:'answerState', state: sanitizeForAnswerView()});
+    conn.send({type:'controllerState', state: sanitizeForController()});
   });
 }
 
-/* ============================== HOST GAME ACTIONS ============================== */
-var Actions = {};
+/* ============================== HOST-AUTHORITATIVE GAME LOGIC ==============================
+   These mutate H directly. They're invoked from the CONTROL_ACTIONS dispatch table below,
+   which is triggered by network messages from the controller device (the main screen itself
+   has no local buttons that call these). */
+function advanceTurn(){
+  var alive = H.players.filter(function(p){return p.alive;});
+  var idx = alive.findIndex(function(p){return p.id===H.currentAskedId;});
+  H.currentAskedId = alive[(idx+1) % alive.length].id;
+}
+function startTimer(){
+  H.timer = {duration:H.roundDuration, endsAt: Date.now() + H.roundDuration*1000, running:true};
+}
 
-Actions.goHostSetup = function(){ localView = 'hostSetup'; render(); };
-Actions.goPlayerSetup = function(){ localView = 'playerSetup'; render(); };
-Actions.goBack = function(){ localView = 'landing'; render(); };
-
-Actions.createRoom = function(){
-  var dur = parseInt(($('#roundDuration')||{}).value, 10) || 60;
-  hostCreateRoom(dur);
-};
-Actions.retryHost = function(){
-  var dur = (H && H.roundDuration) || 60;
-  hostCreateRoom(dur);
-};
-
-Actions.saveCustomQuestions = function(){
-  var ta = $('#customQuestions');
-  var parsed = parseCustomQuestions(ta ? ta.value : '');
-  if (parsed.length === 0){
-    alert('Could not find any valid questions.\n\nUse one per line, in the format:\nQuestion text | Answer text');
-    return;
-  }
-  H.questionBank = parsed;
-  H._deck = [];
-  H.usingCustom = true;
-  pushLog('Loaded ' + parsed.length + ' custom questions');
-  broadcastState(); render();
-};
-Actions.resetQuestions = function(){
-  H.questionBank = QUESTIONS.slice();
-  H._deck = [];
-  H.usingCustom = false;
-  customQuestionsDraft = '';
-  pushLog('Reset to the built-in question bank');
-  broadcastState(); render();
-};
-
-Actions.useCSVQuestions = function(){
-  if (!csvParsedQuestions || csvParsedQuestions.length === 0){
-    alert('No valid rows found in that file. Each row needs a question in the first column and an answer in the second.');
-    return;
-  }
-  H.questionBank = csvParsedQuestions;
-  H._deck = [];
-  H.usingCustom = true;
-  pushLog('Loaded ' + csvParsedQuestions.length + ' questions from ' + (csvFileName || 'a CSV file'));
-  csvParsedQuestions = null; csvFileName = null;
-  broadcastState(); render();
-};
-Actions.clearCSVPreview = function(){
-  csvParsedQuestions = null; csvFileName = null; render();
-};
-Actions.toggleQuestionBank = function(){
-  showQuestionBank = !showQuestionBank;
-  render();
-};
-
-Actions.startGame = function(){
-  if (H.players.length < 3){ alert('You need at least 3 players to start.'); return; }
+function doStartGame(){
+  if (H.players.length < 3) return;
   H.phase = 'playing'; H.round = 1; H.chainIndex = -1;
   H.currentAskedId = H.players[0].id;
   H.currentQuestion = pullQuestion();
   startTimer();
   pushLog('Game started with ' + H.players.length + ' players');
   broadcastState(); render();
-};
-
-Actions.selectAsked = function(playerId){
+}
+function doSelectAsked(playerId){
   if (H.phase !== 'playing') return;
   var p = H.players.filter(function(pl){return pl.id===playerId && pl.alive;})[0];
   if (!p) return;
@@ -583,22 +577,14 @@ Actions.selectAsked = function(playerId){
   H.currentQuestion = pullQuestion();
   H.bankCallPending = false;
   broadcastState(); render();
-};
-
-Actions.nextQuestion = function(){
+}
+function doNextQuestion(){
   if (H.phase !== 'playing' || !H.currentAskedId) return;
   H.currentQuestion = pullQuestion();
   H.bankCallPending = false;
   broadcastState(); render();
-};
-
-function advanceTurn(){
-  var alive = H.players.filter(function(p){return p.alive;});
-  var idx = alive.findIndex(function(p){return p.id===H.currentAskedId;});
-  H.currentAskedId = alive[(idx+1) % alive.length].id;
 }
-
-Actions.markCorrect = function(){
+function doMarkCorrect(){
   if (!H.currentQuestion || !H.currentAskedId) return;
   var p = H.players.filter(function(pl){return pl.id===H.currentAskedId;})[0];
   p.correct++;
@@ -608,8 +594,8 @@ Actions.markCorrect = function(){
   H.currentQuestion = pullQuestion();
   H.bankCallPending = false;
   broadcastState(); render();
-};
-Actions.markIncorrect = function(){
+}
+function doMarkIncorrect(){
   if (!H.currentQuestion || !H.currentAskedId) return;
   var p = H.players.filter(function(pl){return pl.id===H.currentAskedId;})[0];
   p.incorrect++;
@@ -619,9 +605,8 @@ Actions.markIncorrect = function(){
   H.currentQuestion = pullQuestion();
   H.bankCallPending = false;
   broadcastState(); render();
-};
-
-Actions.bankChain = function(){
+}
+function doBankChain(){
   if (H.phase !== 'playing' || H.chainIndex < 0) return;
   var amt = CHAIN_VALUES[H.chainIndex];
   H.bank += amt;
@@ -629,38 +614,23 @@ Actions.bankChain = function(){
   H.chainIndex = -1;
   H.bankCallPending = false;
   broadcastState(); render();
-};
-
-function startTimer(){
-  H.timer = {duration:H.roundDuration, endsAt: Date.now() + H.roundDuration*1000, running:true};
 }
-Actions.endRound = function(){
+function doEndRound(){
   if (H.phase !== 'playing') return;
   H.phase = 'voting'; H.votes = {}; H.currentQuestion = null;
   H.revealing = false; H.revealOrder = null; H.revealIndex = 0;
   H.timer.running = false;
   pushLog('Round ' + H.round + ' ended \u2014 time to vote');
   broadcastState(); render();
-};
-
-setInterval(function(){
-  if (H && H.phase === 'playing' && H.timer.running && Date.now() >= H.timer.endsAt){
-    Actions.endRound();
-  }
-}, 500);
-setInterval(function(){
-  if (role === 'host' && H && (H.phase === 'playing')) render();
-  if (role === 'player' && P.state && P.state.phase === 'playing') render();
-}, 1000);
-
-Actions.startVoteReveal = function(){
+}
+function doStartVoteReveal(){
   if (H.phase !== 'voting' || H.revealing) return;
   H.revealOrder = H.players.filter(function(p){return p.alive;}).map(function(p){return p.id;});
   H.revealIndex = 0;
   H.revealing = true;
   broadcastState(); render();
-};
-Actions.advanceReveal = function(){
+}
+function doAdvanceReveal(){
   if (!H.revealing || !H.revealOrder) return;
   H.revealIndex++;
   if (H.revealIndex >= H.revealOrder.length){
@@ -669,8 +639,7 @@ Actions.advanceReveal = function(){
     return;
   }
   broadcastState(); render();
-};
-
+}
 function resolveVotes(){
   var alive = H.players.filter(function(p){return p.alive;});
   var tally = {};
@@ -696,10 +665,6 @@ function resolveVotes(){
   H.tieTally = tally;
   broadcastState(); render();
 }
-Actions.manualTieBreak = function(playerId){
-  var p = H.players.filter(function(pl){return pl.id===playerId;})[0];
-  finalizeElimination(p, H.tieTally, 'The host broke the tie.');
-};
 function finalizeElimination(eliminated, tally, note){
   eliminated.alive = false;
   H.lastElimination = {
@@ -714,8 +679,12 @@ function finalizeElimination(eliminated, tally, note){
   pushLog('\uD83D\uDEAA ' + eliminated.name + ' voted off as the Weakest Link');
   broadcastState(); render();
 }
-
-Actions.continueAfterElimination = function(){
+function doManualTieBreak(playerId){
+  var p = H.players.filter(function(pl){return pl.id===playerId;})[0];
+  if (!p) return;
+  finalizeElimination(p, H.tieTally, 'The host broke the tie.');
+}
+function doContinueAfterElimination(){
   var alive = H.players.filter(function(p){return p.alive;});
   if (alive.length === 2){
     H.phase = 'shootout';
@@ -727,19 +696,19 @@ Actions.continueAfterElimination = function(){
     startTimer();
   }
   broadcastState(); render();
-};
+}
 
 /* ---- shootout ---- */
 function scoreOf(s, idx){
   return s.rounds.reduce(function(sum,r){ return sum + ((r['p'+idx]==='correct')?1:0); }, 0);
 }
-Actions.shootoutNextQuestion = function(){
+function doShootoutNextQuestion(){
   var s = H.shootout;
   if (!s || s.winnerId) return;
   s.currentQuestion = pullQuestion();
   broadcastState(); render();
-};
-Actions.shootoutMark = function(result){
+}
+function doShootoutMark(result){
   var s = H.shootout;
   if (!s || !s.currentQuestion) return;
   var turnPid = s.order[s.currentTurn];
@@ -757,7 +726,7 @@ Actions.shootoutMark = function(result){
     s.currentQuestion = pullQuestion();
   }
   broadcastState(); render();
-};
+}
 function checkShootoutEnd(){
   var s = H.shootout;
   var REG = 5;
@@ -787,8 +756,7 @@ function declareShootoutWinner(idx){
   H.winner = winner.name;
   pushLog('\uD83C\uDFC6 ' + winner.name + ' wins the game!');
 }
-
-Actions.playAgain = function(){
+function doPlayAgain(){
   var oldPlayers = H.players.map(function(p){ return {id:p.id,name:p.name,alive:true,correct:0,incorrect:0,connected:p.connected}; });
   var dur = H.roundDuration, code = H.roomCode, ready = H.ready;
   var qBank = H.questionBank, usingCustom = H.usingCustom;
@@ -796,6 +764,110 @@ Actions.playAgain = function(){
   H.roundDuration = dur; H.roomCode = code; H.ready = ready; H.players = oldPlayers;
   H.questionBank = qBank; H.usingCustom = usingCustom;
   broadcastState(); render();
+}
+
+/* ---- lobby management (host controls only, always via the controller) ---- */
+function doKickPlayer(playerId){
+  if (H.phase !== 'lobby') return;
+  var idx = H.players.findIndex(function(p){return p.id===playerId;});
+  if (idx === -1) return;
+  var p = H.players[idx];
+  var conn = hostConns[playerId];
+  if (conn){ try{ if (conn.open) conn.send({type:'kicked'}); }catch(e){} try{ conn.close(); }catch(e){} }
+  delete hostConns[playerId];
+  H.players.splice(idx, 1);
+  pushLog(p.name + ' was removed by the host');
+  broadcastState(); render();
+}
+function doAddPlayer(name){
+  if (H.phase !== 'lobby') return;
+  name = (name || 'Player').toString().trim().slice(0,18);
+  if (!name) return;
+  var finalName = name, n = 2;
+  while (H.players.some(function(pl){ return pl.name.toLowerCase() === finalName.toLowerCase(); })){
+    finalName = name + ' ' + n; n++;
+  }
+  var p = {id:uid(), name:finalName, alive:true, correct:0, incorrect:0, connected:false};
+  H.players.push(p);
+  pushLog(finalName + ' added by the host');
+  broadcastState(); render();
+}
+function doSetQuestionBank(payload){
+  if (!payload || !Array.isArray(payload.questions) || payload.questions.length === 0) return;
+  H.questionBank = payload.questions;
+  H._deck = [];
+  H.usingCustom = !!payload.usingCustom;
+  pushLog('Loaded ' + payload.questions.length + ' custom questions');
+  broadcastState(); render();
+}
+function doResetQuestionBank(){
+  H.questionBank = QUESTIONS.slice();
+  H._deck = [];
+  H.usingCustom = false;
+  pushLog('Reset to the built-in question bank');
+  broadcastState(); render();
+}
+
+var CONTROL_ACTIONS = {
+  startGame: function(){ doStartGame(); },
+  selectAsked: function(arg){ doSelectAsked(arg); },
+  nextQuestion: function(){ doNextQuestion(); },
+  markCorrect: function(){ doMarkCorrect(); },
+  markIncorrect: function(){ doMarkIncorrect(); },
+  bankChain: function(){ doBankChain(); },
+  endRound: function(){ doEndRound(); },
+  startVoteReveal: function(){ doStartVoteReveal(); },
+  advanceReveal: function(){ doAdvanceReveal(); },
+  manualTieBreak: function(arg){ doManualTieBreak(arg); },
+  continueAfterElimination: function(){ doContinueAfterElimination(); },
+  shootoutNextQuestion: function(){ doShootoutNextQuestion(); },
+  shootoutMark: function(arg){ doShootoutMark(arg); },
+  playAgain: function(){ doPlayAgain(); },
+  kickPlayer: function(arg){ doKickPlayer(arg); },
+  addPlayer: function(arg){ doAddPlayer(arg); },
+  setQuestionBank: function(arg){ doSetQuestionBank(arg); },
+  resetQuestionBank: function(){ doResetQuestionBank(); },
+  requestQuestionBank: function(arg, conn){ if (conn && conn.open) conn.send({type:'questionBankData', questions: H.questionBank}); }
+};
+
+setInterval(function(){
+  if (H && H.phase === 'playing' && H.timer.running && Date.now() >= H.timer.endsAt){
+    doEndRound();
+  }
+}, 500);
+
+/* Lightweight timer ticker: updates ONLY the big countdown text/color directly in the DOM,
+   never calling render(), so the rest of the screen (podiums etc.) never re-mounts and
+   never flickers while everyone is just waiting on a mark. */
+function tickLiveTimers(){
+  var endsAt = null, running = false;
+  if (role === 'host' && H && H.phase === 'playing'){ endsAt = H.timer.endsAt; running = H.timer.running; }
+  else if (role === 'controller' && CTRL.state && CTRL.state.phase === 'playing'){ endsAt = CTRL.state.timer.endsAt; running = CTRL.state.timer.running; }
+  else if (role === 'player' && P.state && P.state.phase === 'playing'){ endsAt = P.state.timer.endsAt; running = P.state.timer.running; }
+  var text = running ? fmtClock(endsAt - Date.now()) : '--:--';
+  var low = running && (endsAt - Date.now()) < 10000;
+  var nodes = document.querySelectorAll('.js-timer');
+  for (var i = 0; i < nodes.length; i++){
+    nodes[i].textContent = text;
+    if (low) nodes[i].classList.add('low'); else nodes[i].classList.remove('low');
+  }
+}
+setInterval(tickLiveTimers, 500);
+
+var Actions = {};
+
+Actions.goHostSetup = function(){ localView = 'hostSetup'; render(); };
+Actions.goPlayerSetup = function(){ localView = 'playerSetup'; render(); };
+Actions.goControllerSetup = function(){ localView = 'controllerSetup'; render(); };
+Actions.goBack = function(){ localView = 'landing'; render(); };
+
+Actions.createRoom = function(){
+  var dur = parseInt(($('#roundDuration')||{}).value, 10) || 60;
+  hostCreateRoom(dur);
+};
+Actions.retryHost = function(){
+  var dur = (H && H.roundDuration) || 60;
+  hostCreateRoom(dur);
 };
 
 /* ============================== PLAYER NETWORKING ============================== */
@@ -872,7 +944,7 @@ Actions.reconnectNow = function(){
 };
 Actions.retryJoin = function(){
   localView = 'playerSetup'; role = null; clearPlayerSession();
-  P = {conn:null,roomCode:'',myName:'',myId:null,state:null,error:null,denied:null,connLost:false,localVoted:false,bankFlash:false};
+  P = {conn:null,roomCode:'',myName:'',myId:null,state:null,error:null,denied:null,connLost:false,localVoted:false,bankFlash:false,renameError:null};
   render();
 };
 
@@ -890,6 +962,13 @@ function handleHostMessage(msg){
     P.denied = msg.reason;
     clearPlayerSession();
     render();
+  } else if (msg.type === 'kicked'){
+    P.denied = 'You were removed from the game by the host.';
+    clearPlayerSession();
+    render();
+  } else if (msg.type === 'renameFailed'){
+    P.renameError = msg.reason;
+    render();
   }
 }
 Actions.submitVote = function(){
@@ -905,48 +984,107 @@ Actions.callBank = function(){
   render();
   setTimeout(function(){ P.bankFlash = false; render(); }, 2500);
 };
+Actions.renameMe = function(){
+  var input = $('#renameInput');
+  var newName = input ? input.value.trim() : '';
+  if (!newName || !P.conn) return;
+  P.renameError = null;
+  P.conn.send({type:'rename', newName: newName});
+  render();
+};
 
-/* ============================== ANSWER-VIEW (2ND SCREEN) NETWORKING ============================== */
-function connectAnswerViewToHost(code){
-  role = 'answerView';
-  AV.roomCode = code; AV.error = null;
+/* ============================== CONTROLLER (2ND SCREEN) NETWORKING ============================== */
+function connectControllerToHost(code){
+  role = 'controller';
+  CTRL.roomCode = code; CTRL.error = null;
   try{
     peer = new Peer(undefined, {debug:0});
   } catch(e){
-    AV.error = 'Could not start a connection. Try again.';
+    CTRL.error = 'Could not start a connection. Try again.';
     render(); return;
   }
   peer.on('open', function(){
     var conn = peer.connect('wlink-' + code, {reliable:true});
-    AV.conn = conn;
-    conn.on('open', function(){ conn.send({type:'joinAnswerView'}); AV.connLost = false; render(); });
-    conn.on('data', function(d){
-      if (d.type === 'answerState'){ AV.state = d.state; AV.connLost = false; render(); }
-    });
+    CTRL.conn = conn;
+    conn.on('open', function(){ conn.send({type:'joinController'}); CTRL.connLost = false; render(); });
+    conn.on('data', function(d){ handleControllerMessage(d); });
     conn.on('close', function(){
-      AV.connLost = true; render();
-      setTimeout(function(){ if (role === 'answerView' && AV.connLost) connectAnswerViewToHost(code); }, 3000);
+      CTRL.connLost = true; render();
+      setTimeout(function(){ if (role === 'controller' && CTRL.connLost) connectControllerToHost(code); }, 3000);
     });
     render();
   });
   peer.on('disconnected', function(){ try{ peer.reconnect(); }catch(e){} });
   peer.on('error', function(err){
-    AV.error = (err && err.type === 'peer-unavailable')
+    CTRL.error = (err && err.type === 'peer-unavailable')
       ? 'Room not found. Double-check the code with your host.'
       : 'Connection error (' + (err && err.type) + '). Check your internet and try again.';
     render();
   });
   render();
 }
-Actions.goAnswerViewSetup = function(){ localView = 'answerViewSetup'; render(); };
-Actions.joinAnswerView = function(){
-  var code = (($('#avRoomCodeInput')||{}).value || '').trim().toUpperCase();
+function handleControllerMessage(msg){
+  if (msg.type === 'welcomeController'){ CTRL.error = null; render(); }
+  else if (msg.type === 'controllerState'){ CTRL.state = msg.state; CTRL.connLost = false; render(); }
+  else if (msg.type === 'questionBankData'){ CTRL.questionBankCache = msg.questions; render(); }
+}
+function sendControl(action, arg){
+  if (CTRL.conn && CTRL.conn.open) CTRL.conn.send({type:'control', action:action, arg:arg});
+}
+
+Actions.ctrlJoin = function(){
+  var code = (($('#ctrlRoomCodeInput')||{}).value || '').trim().toUpperCase();
   if (!code){ alert('Enter the room code.'); return; }
-  connectAnswerViewToHost(code);
+  connectControllerToHost(code);
 };
-Actions.retryAnswerView = function(){
-  localView = 'answerViewSetup'; role = null;
-  AV = {conn:null, roomCode:'', state:null, error:null, connLost:false};
+Actions.ctrlRetry = function(){
+  localView = 'controllerSetup'; role = null;
+  CTRL = {conn:null, roomCode:'', state:null, error:null, connLost:false, questionBankCache:null};
+  render();
+};
+Actions.ctrlStartGame = function(){ sendControl('startGame'); };
+Actions.ctrlSelectAsked = function(id){ sendControl('selectAsked', id); };
+Actions.ctrlNextQuestion = function(){ sendControl('nextQuestion'); };
+Actions.ctrlMarkCorrect = function(){ sendControl('markCorrect'); };
+Actions.ctrlMarkIncorrect = function(){ sendControl('markIncorrect'); };
+Actions.ctrlBankChain = function(){ sendControl('bankChain'); };
+Actions.ctrlEndRound = function(){ sendControl('endRound'); };
+Actions.ctrlStartVoteReveal = function(){ sendControl('startVoteReveal'); };
+Actions.ctrlAdvanceReveal = function(){ sendControl('advanceReveal'); };
+Actions.ctrlManualTieBreak = function(id){ sendControl('manualTieBreak', id); };
+Actions.ctrlContinueAfterElimination = function(){ sendControl('continueAfterElimination'); };
+Actions.ctrlShootoutNextQuestion = function(){ sendControl('shootoutNextQuestion'); };
+Actions.ctrlShootoutMark = function(result){ sendControl('shootoutMark', result); };
+Actions.ctrlPlayAgain = function(){ sendControl('playAgain'); };
+Actions.ctrlKickPlayer = function(id){ sendControl('kickPlayer', id); };
+Actions.ctrlAddPlayer = function(){
+  var input = $('#addPlayerInput');
+  var name = input ? input.value.trim() : '';
+  if (!name) return;
+  sendControl('addPlayer', name);
+};
+Actions.ctrlSaveCustomQuestions = function(){
+  var ta = $('#ctrlCustomQuestions');
+  var parsed = parseCustomQuestions(ta ? ta.value : '');
+  if (parsed.length === 0){
+    alert('Could not find any valid questions.\n\nUse one per line, in the format:\nQuestion text | Answer text');
+    return;
+  }
+  sendControl('setQuestionBank', {questions:parsed, usingCustom:true});
+};
+Actions.ctrlResetQuestions = function(){ sendControl('resetQuestionBank'); };
+Actions.ctrlUseCSVQuestions = function(){
+  if (!ctrlCsvParsedQuestions || ctrlCsvParsedQuestions.length === 0){
+    alert('No valid rows found in that file.');
+    return;
+  }
+  sendControl('setQuestionBank', {questions:ctrlCsvParsedQuestions, usingCustom:true});
+  ctrlCsvParsedQuestions = null; ctrlCsvFileName = null;
+};
+Actions.ctrlClearCSVPreview = function(){ ctrlCsvParsedQuestions = null; ctrlCsvFileName = null; render(); };
+Actions.ctrlToggleQuestionBank = function(){
+  ctrlShowQuestionBank = !ctrlShowQuestionBank;
+  if (ctrlShowQuestionBank) sendControl('requestQuestionBank');
   render();
 };
 
@@ -955,12 +1093,12 @@ function landingView(){
   return '' +
   '<div class="landing">' +
     '<h1 class="brand">CHAIN <span>REACTION</span></h1>' +
-    '<p class="tag">A live trivia elimination game. Host it on the big screen, everyone else plays from their phone.</p>' +
+    '<p class="tag">A live trivia elimination game. Cast the main screen for everyone to watch, run it from the host controller on your phone.</p>' +
     '<div class="landing-btns">' +
       '<button class="big-btn gold" data-action="goHostSetup">Host a game</button>' +
       '<button class="big-btn ghost" data-action="goPlayerSetup">Join a game</button>' +
     '</div>' +
-    '<button class="back-link" style="margin-top:26px;" data-action="goAnswerViewSetup">Hosting? Open the answer view (2nd screen) \u2192</button>' +
+    '<button class="back-link" style="margin-top:26px;" data-action="goControllerSetup">Hosting? Open the host controller (2nd device) \u2192</button>' +
   '</div>';
 }
 function hostSetupView(){
@@ -969,6 +1107,7 @@ function hostSetupView(){
     '<div class="setup-card">' +
       '<button class="back-link" data-action="goBack">\u2190 Back</button>' +
       '<h2 style="margin:0;">Host a game</h2>' +
+      '<p style="color:var(--muted);font-size:13px;margin:10px 0 0;">This device becomes the main screen \u2014 cast it or put it on a TV. You\'ll run the game from a separate host controller.</p>' +
       '<label for="roundDuration">Seconds per round</label>' +
       '<select id="roundDuration">' +
         '<option value="45">45 seconds</option>' +
@@ -994,35 +1133,37 @@ function playerSetupView(){
     '</div>' +
   '</div>';
 }
-function answerViewSetupView(){
+function controllerSetupView(){
   return '' +
   '<div class="landing">' +
     '<div class="setup-card">' +
       '<button class="back-link" data-action="goBack">\u2190 Back</button>' +
-      '<h2 style="margin:0;">Answer view</h2>' +
-      '<p style="color:var(--muted);font-size:13px;margin:10px 0 0;">Open this on a second device (like your phone) while the main game is on the shared screen. It shows the current question\'s answer privately \u2014 handy for reading it out loud without the audience seeing.</p>' +
-      '<label for="avRoomCodeInput">Room code</label>' +
-      '<input id="avRoomCodeInput" maxlength="4" placeholder="e.g. QWXK" autocomplete="off" style="text-transform:uppercase;letter-spacing:3px;">' +
-      '<button class="big-btn gold full-btn" data-action="joinAnswerView">Open answer view</button>' +
+      '<h2 style="margin:0;">Host controller</h2>' +
+      '<p style="color:var(--muted);font-size:13px;margin:10px 0 0;">Run the game from here \u2014 the main screen stays clean for players and the audience to watch.</p>' +
+      '<label for="ctrlRoomCodeInput">Room code</label>' +
+      '<input id="ctrlRoomCodeInput" maxlength="4" placeholder="e.g. QWXK" autocomplete="off" style="text-transform:uppercase;letter-spacing:3px;">' +
+      '<button class="big-btn gold full-btn" data-action="ctrlJoin">Open controller</button>' +
     '</div>' +
   '</div>';
 }
 
-/* ============================== VIEWS: HOST ============================== */
+/* ============================== SHARED COMPONENTS ============================== */
 function ladderHtml(chainIndex){
-  return '<div class="ladder">' + CHAIN_VALUES.map(function(v,i){
-    var cls = i===chainIndex ? 'rung current' : (i<chainIndex ? 'rung climbed' : 'rung');
+  return '<div class="ladder-h">' + CHAIN_VALUES.map(function(v,i){
+    var cls = i===chainIndex ? 'rung-h current' : (i<chainIndex ? 'rung-h climbed' : 'rung-h');
     return '<div class="'+cls+'">'+fmtMoney(v)+'</div>';
   }).join('') + '</div>';
+}
+function bigTimerHtml(){
+  return '<div class="big-timer js-timer">--:--</div>';
 }
 function podiumRow(players, opts){
   opts = opts || {};
   return '<div class="podium-row">' + players.map(function(p){
     var isSpot = p.id === opts.highlightId;
-    var cls = 'podium' + (isSpot ? ' spotlight' : '') + (opts.selectable ? ' selectable' : '');
+    var cls = 'podium' + (isSpot ? ' spotlight' : '');
     var acc = accuracyOf(p);
-    var action = opts.selectable ? ' data-action="selectAsked" data-arg="'+p.id+'"' : '';
-    return '<div class="'+cls+'"'+action+'>' +
+    return '<div class="'+cls+'">' +
       (isSpot ? '<div class="spotlight-beam"></div>' : '') +
       '<div class="podium-name">'+esc(p.name)+(p.connected===false?' \uD83D\uDCF5':'')+'</div>' +
       (opts.showAccuracy ? '<div class="podium-acc">'+(acc===null?'\u2014':acc+'%')+' \u00b7 '+p.correct+'\u2713/'+p.incorrect+'\u2717</div>' : '') +
@@ -1030,7 +1171,40 @@ function podiumRow(players, opts){
     '</div>';
   }).join('') + '</div>';
 }
+function controllerRoster(players, currentAskedId, selectable){
+  var list = selectable ? players.filter(function(p){return p.alive;}) : players;
+  return '<div class="roster">' + list.map(function(p){
+    var acc = accuracyOf(p);
+    var cls = 'chip' + (p.id===currentAskedId?' selected':'');
+    var action = selectable ? ' data-action="ctrlSelectAsked" data-arg="'+p.id+'" style="cursor:pointer;"' : '';
+    return '<div class="'+cls+'"'+action+'>' +
+      '<span><span class="dot'+(p.connected?'':' off')+'"></span>'+esc(p.name)+'</span>' +
+      '<span class="sub">'+(acc===null?'\u2014':acc+'%')+' \u00b7 '+p.correct+'\u2713/'+p.incorrect+'\u2717</span>' +
+    '</div>';
+  }).join('') + '</div>';
+}
+function kickBoxes(s, pIdx){
+  var out = '';
+  for (var i=0;i<5;i++){
+    var r = s.rounds[i];
+    var v = r ? r['p'+pIdx] : null;
+    var cls = v==='correct' ? 'kick hit' : (v==='incorrect' ? 'kick miss' : 'kick');
+    out += '<div class="'+cls+'">'+(v==='correct'?'\u2713':(v==='incorrect'?'\u2717':''))+'</div>';
+  }
+  return '<div class="kicks">'+out+'</div>';
+}
+function standingsHtml(players){
+  var sorted = players.slice().sort(function(a,b){
+    if (a.alive !== b.alive) return a.alive ? -1 : 1;
+    return (b.correct-b.incorrect) - (a.correct-a.incorrect);
+  });
+  return '<div class="standings">'+sorted.map(function(p){
+    var acc = accuracyOf(p);
+    return '<div class="r"><span>'+esc(p.name)+'</span><span>'+(acc===null?'\u2014':acc+'%')+' \u00b7 '+p.correct+'\u2713/'+p.incorrect+'\u2717</span></div>';
+  }).join('')+'</div>';
+}
 
+/* ============================== VIEWS: HOST (MAIN SCREEN — DISPLAY ONLY) ============================== */
 function hostRootView(){
   if (H.error){
     return '<div class="landing"><div class="error-box">'+esc(H.error)+'</div><button class="big-btn gold" data-action="retryHost">Try again</button></div>';
@@ -1046,220 +1220,257 @@ function hostRootView(){
   if (H.phase === 'gameover') return hostGameOverView();
   return '<div class="center-msg">Unknown phase.</div>';
 }
-
-function topBarHtml(extraChips){
-  var chips = '<span class="stat-chip gold"><b>'+fmtMoney(H.bank)+'</b>Bank</span>';
-  if (H.phase === 'playing'){
-    var remain = H.timer.running ? fmtClock(H.timer.endsAt - Date.now()) : '--:--';
-    var low = H.timer.running && (H.timer.endsAt - Date.now()) < 10000;
-    chips += '<span class="stat-chip timer'+(low?' low':'')+'"><b>'+remain+'</b>Time left</span>';
-    chips += '<span class="stat-chip"><b>'+H.round+'</b>Round</span>';
-  }
-  chips += '<button class="stat-chip" style="cursor:pointer;" data-action="toggleQuestionBank">'+(showQuestionBank?'Hide':'View')+' bank ('+H.questionBank.length+')</button>';
-  var bar = '<div class="top-bar"><div class="room-pill">ROOM '+esc(H.roomCode)+'</div><div class="stat-strip">'+chips+(extraChips||'')+'</div></div>';
-  if (showQuestionBank){
-    bar += '<div class="panel qbank-panel" style="margin:0 22px 16px;"><h3>Question bank \u2014 '+H.questionBank.length+' questions</h3>'+questionListHtml()+'</div>';
-  }
-  return bar;
+function topBarSimple(){
+  return '<div class="top-bar"><div class="room-pill">ROOM '+esc(H.roomCode)+'</div><div class="stat-strip">' +
+    '<span class="stat-chip gold"><b>'+fmtMoney(H.bank)+'</b>Bank</span>' +
+    (H.phase==='playing' ? '<span class="stat-chip"><b>'+H.round+'</b>Round</span>' : '') +
+    '</div></div>';
 }
-
 function hostLobbyView(){
-  return '' +
-  '<div class="top-bar"><div class="room-pill">ROOM '+esc(H.roomCode)+'</div><div class="stat-strip"><span class="stat-chip"><b>'+H.players.length+'</b>Joined</span></div></div>' +
-  '<div style="padding:24px 22px;max-width:640px;margin:0 auto;width:100%;text-align:center;">' +
-    '<p style="color:var(--muted);">Have everyone go to this page and tap <b style="color:var(--text);">Join a game</b>, then enter this code:</p>' +
-    '<h1 class="display" style="font-size:64px;letter-spacing:10px;color:var(--gold);margin:6px 0 24px;">'+esc(H.roomCode)+'</h1>' +
-    (H.players.length ? podiumRow(H.players, {}) : '<p class="center-msg" style="padding:10px;">Waiting for players to join\u2026</p>') +
-    questionBankPanel() +
-    '<button class="big-btn gold full-btn" data-action="startGame" style="max-width:320px;">Start game ('+H.players.length+' joined, need 3+)</button>' +
+  return '<div class="main-compact">' +
+    '<div class="top-bar"><div class="room-pill">ROOM '+esc(H.roomCode)+'</div><div class="stat-strip"><span class="stat-chip"><b>'+H.players.length+'</b>Joined</span></div></div>' +
+    '<div style="text-align:center;padding:6px 0 18px;">' +
+      '<p style="color:var(--muted);margin:0 0 6px;">Join at this code:</p>' +
+      '<h1 style="font-family:\'Oswald\',sans-serif;font-size:clamp(40px,10vw,64px);letter-spacing:10px;color:var(--gold);margin:0;">'+esc(H.roomCode)+'</h1>' +
+    '</div>' +
+    (H.players.length ? podiumRow(H.players, {}) : '<p class="center-msg">Waiting for players to join\u2026</p>') +
+    '<p class="center-msg" style="padding-top:6px;font-size:13px;">The host runs this game from the controller on a second device.</p>' +
   '</div>';
 }
-
-function questionListHtml(){
-  return '<div class="qbank-list">' + H.questionBank.map(function(pair,i){
-    return '<div class="qbank-row"><span class="qbank-num">'+(i+1)+'.</span>' +
-      '<div><div class="qbank-q">'+esc(pair[0])+'</div><div class="qbank-a">'+esc(pair[1])+'</div></div></div>';
-  }).join('') + '</div>';
-}
-function questionBankPanel(){
-  var statusLine = H.usingCustom
-    ? '<span style="color:var(--gold);">Using '+H.questionBank.length+' custom question'+(H.questionBank.length===1?'':'s')+'</span>'
-    : '<span style="color:var(--muted);">Using the '+H.questionBank.length+' built-in questions</span>';
-  var draftValue = customQuestionsDraft || (H.usingCustom ? H.questionBank.map(function(pair){return pair[0]+' | '+pair[1];}).join('\n') : '');
-
-  var csvSection;
-  if (csvParsedQuestions){
-    csvSection = '<div style="margin-top:10px;font-size:13px;color:var(--gold);">Found '+csvParsedQuestions.length+' question'+(csvParsedQuestions.length===1?'':'s')+' in '+esc(csvFileName)+'</div>' +
-      '<div class="action-row" style="justify-content:flex-start;margin-top:8px;">' +
-        '<button class="act-btn primary" data-action="useCSVQuestions">Use these '+csvParsedQuestions.length+' questions</button>' +
-        '<button class="act-btn neutral" data-action="clearCSVPreview">Cancel</button>' +
-      '</div>';
-  } else {
-    csvSection = '';
-  }
-
-  return '<div class="panel" style="text-align:left;margin-top:14px;">' +
-    '<h3>Question bank</h3>' +
-    '<p style="font-size:13px;color:var(--muted);margin:0 0 10px;">'+statusLine+
-      ' &middot; <button class="back-link" style="display:inline;padding:0;font-size:13px;color:var(--blue);" data-action="toggleQuestionBank">'+(showQuestionBank?'Hide list':'View all questions')+'</button></p>' +
-    (showQuestionBank ? questionListHtml() : '') +
-    '<p style="font-size:12px;color:var(--muted);margin:14px 0 6px;">Paste your own, one per line: <code style="color:var(--text);">Question text | Answer text</code></p>' +
-    '<textarea id="customQuestions" rows="5" placeholder="What is the capital of France? | Paris\nHow many legs does a spider have? | Eight" ' +
-      'style="width:100%;padding:12px 14px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--text);font-size:14px;font-family:Inter,sans-serif;resize:vertical;">'+esc(draftValue)+'</textarea>' +
-    '<div class="action-row" style="justify-content:flex-start;margin-top:10px;">' +
-      '<button class="act-btn primary" data-action="saveCustomQuestions">Use these questions</button>' +
-      (H.usingCustom ? '<button class="act-btn neutral" data-action="resetQuestions">Reset to built-in</button>' : '') +
-    '</div>' +
-    '<div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--line);">' +
-      '<p style="font-size:12px;color:var(--muted);margin:0 0 8px;">Or upload a CSV file with two columns: question, answer</p>' +
-      '<input type="file" id="csvFileInput" accept=".csv,text/csv" style="color:var(--text);font-size:13px;">' +
-      csvSection +
-    '</div>' +
-  '</div>';
-}
-
 function hostPlayingView(){
   var askedPlayer = H.players.filter(function(p){return p.id===H.currentAskedId;})[0];
   var alive = H.players.filter(function(p){return p.alive;});
-  var stage;
-  if (H.currentQuestion){
-    stage = '<div class="stage">' +
-      '<div class="q-label">Reading to '+esc(askedPlayer?askedPlayer.name:'')+'</div>' +
-      '<div class="q-text">'+esc(H.currentQuestion[0])+'</div>' +
-      '<div class="a-text">Answer: '+esc(H.currentQuestion[1])+'</div>' +
-      '<div class="action-row">' +
-        '<button class="act-btn correct" data-action="markCorrect">Correct <span class="kbd">C</span></button>' +
-        '<button class="act-btn incorrect" data-action="markIncorrect">Incorrect <span class="kbd">I</span></button>' +
-      '</div>' +
-      '<div class="action-row" style="margin-top:8px;"><button class="act-btn neutral" data-action="nextQuestion">Skip \u2014 new question</button></div>' +
-    '</div>';
-  } else {
-    stage = '<div class="stage">' +
-      '<div class="q-label">On the spot</div>' +
-      '<div class="q-text" style="color:var(--blue);">'+esc(askedPlayer?askedPlayer.name:'\u2014')+'</div>' +
-      '<div class="action-row"><button class="act-btn primary" data-action="nextQuestion">Ask next question</button></div>' +
-    '</div>';
-  }
-  var logHtml = '<div class="log">' + H.log.map(function(l){ return '<div>'+esc(l.msg)+'</div>'; }).join('') + '</div>';
-  return '' +
-    topBarHtml() +
-    podiumRow(alive, {highlightId: H.currentAskedId, selectable: true, showAccuracy: true}) +
-    '<div class="main-grid two-col">' +
-      '<div class="panel"><h3>Chain</h3>'+ladderHtml(H.chainIndex)+
-        '<div class="bank-total"><div class="amt">'+fmtMoney(H.bank)+'</div><div class="lbl">Team bank</div></div>' +
-        (H.bankCallPending ? '<div class="banner" style="margin-top:10px;">\uD83D\uDD14 '+esc(askedPlayer?askedPlayer.name:'')+' wants to bank!</div>' : '') +
-        '<button class="act-btn bank full-btn" data-action="bankChain" '+(H.chainIndex<0?'disabled':'')+'>Bank '+(H.chainIndex>=0?fmtMoney(CHAIN_VALUES[H.chainIndex]):'')+'</button>' +
-      '</div>' +
-      '<div class="panel">'+stage+'<div class="action-row" style="margin-top:14px;"><button class="act-btn neutral" data-action="endRound">End round now</button></div>'+logHtml+'</div>' +
-    '</div>';
+  return '<div class="main-compact">' +
+    topBarSimple() +
+    bigTimerHtml() +
+    podiumRow(alive, {highlightId: H.currentAskedId}) +
+    (H.currentQuestion
+      ? '<div class="stage compact"><div class="q-label">Reading to '+esc(askedPlayer?askedPlayer.name:'')+'</div><div class="q-text">'+esc(H.currentQuestion[0])+'</div></div>'
+      : '<div class="stage compact"><div class="q-label">On the spot</div><div class="q-text" style="color:var(--blue);">'+esc(askedPlayer?askedPlayer.name:'\u2014')+'</div></div>') +
+    ladderHtml(H.chainIndex) +
+  '</div>';
 }
-
 function hostVotingView(){
   var alive = H.players.filter(function(p){return p.alive;});
   if (H.tieCandidates){
-    var cands = H.players.filter(function(p){return H.tieCandidates.indexOf(p.id)>=0;});
-    return topBarHtml() + podiumRow(alive, {}) + '<div style="padding:24px 22px;max-width:520px;margin:0 auto;text-align:center;">' +
-      '<h2>It\'s a tie</h2><p class="tag">Performance stats didn\'t break it either. As host, pick who goes home:</p>' +
-      '<div class="action-row">'+cands.map(function(p){ return '<button class="act-btn incorrect" data-action="manualTieBreak" data-arg="'+p.id+'">'+esc(p.name)+'</button>'; }).join('')+'</div>' +
-    '</div>';
+    return '<div class="main-compact">' + topBarSimple() + podiumRow(alive,{}) +
+      '<div style="text-align:center;padding:16px;"><h2>It\'s a tie!</h2><p class="tag">The host is deciding\u2026</p></div></div>';
   }
   if (H.revealing && H.revealOrder){
     var targetId = H.revealOrder[H.revealIndex];
     var voter = H.players.filter(function(p){return p.id===targetId;})[0];
     var votedForId = H.votes[targetId];
     var votedFor = votedForId ? H.players.filter(function(p){return p.id===votedForId;})[0] : null;
-    var isLast = H.revealIndex === H.revealOrder.length - 1;
-    return topBarHtml() + podiumRow(alive, {highlightId: targetId}) +
-      '<div style="padding:10px 22px;text-align:center;">' +
-      '<p class="tag">Revealing vote '+(H.revealIndex+1)+' of '+H.revealOrder.length+'</p>' +
-      '<div class="elim-card" style="padding:10px;">' +
+    return '<div class="main-compact">' + topBarSimple() +
+      podiumRow(alive, {highlightId: targetId}) +
+      '<div class="elim-card" style="padding:14px;">' +
         '<div class="q-label">'+esc(voter?voter.name:'')+' voted for</div>' +
-        '<div class="name" style="color:var(--gold);font-size:32px;">'+(votedFor?esc(votedFor.name):'No one \u2014 no vote cast')+'</div>' +
-      '</div>' +
-      '<button class="big-btn gold" data-action="advanceReveal">'+(isLast?'Show result':'Reveal next vote')+'</button>' +
-    '</div>';
+        '<div class="name" style="color:var(--gold);">'+(votedFor?esc(votedFor.name):'No one')+'</div>' +
+      '</div></div>';
   }
   var votedCount = Object.keys(H.votes).length;
-  var rows = alive.map(function(p){
-    var voted = !!H.votes[p.id];
-    return '<div class="vote-row"><span>'+esc(p.name)+'</span><span class="'+(voted?'yes':'no')+'">'+(voted?'Voted \u2713':'Waiting\u2026')+'</span></div>';
-  }).join('');
-  return topBarHtml() + podiumRow(alive, {}) + '<div style="padding:10px 22px;text-align:center;">' +
-    '<h2>Voting \u2014 who\'s the weakest link?</h2>' +
-    '<p class="tag">'+votedCount+' of '+alive.length+' voted</p>' +
-    '<div class="vote-grid">'+rows+'</div>' +
-    '<button class="big-btn gold" style="margin-top:22px;" data-action="startVoteReveal">Reveal votes</button>' +
-  '</div>';
+  return '<div class="main-compact">' + topBarSimple() + podiumRow(alive,{}) +
+    '<div style="text-align:center;padding:16px;"><h2>Voting\u2026</h2><p class="tag">'+votedCount+' of '+alive.length+' voted</p></div></div>';
 }
-
 function hostEliminationView(){
   var e = H.lastElimination;
   var alive = H.players.filter(function(p){return p.alive;});
-  return topBarHtml() + podiumRow(alive, {}) + '<div class="elim-card">' +
-    '<div class="q-label">Voted off</div>' +
-    '<div class="name">'+esc(e.name)+'</div>' +
+  return '<div class="main-compact">' + topBarSimple() + podiumRow(alive,{}) +
+    '<div class="elim-card"><div class="q-label">Voted off</div><div class="name">'+esc(e.name)+'</div>' +
     (e.note ? '<p class="tag">'+esc(e.note)+'</p>' : '') +
     '<div class="tally">'+e.tally.map(function(t){ return '<div class="r"><span>'+esc(t.name)+'</span><span>'+t.votes+' vote'+(t.votes===1?'':'s')+'</span></div>'; }).join('')+'</div>' +
-    '<button class="big-btn gold" data-action="continueAfterElimination">'+(alive.length===2?'Continue to final shootout':'Continue to round '+(H.round+1))+'</button>' +
-  '</div>';
-}
-
-function kickBoxes(s, pIdx){
-  var out = '';
-  for (var i=0;i<5;i++){
-    var r = s.rounds[i];
-    var v = r ? r['p'+pIdx] : null;
-    var cls = v==='correct' ? 'kick hit' : (v==='incorrect' ? 'kick miss' : 'kick');
-    out += '<div class="'+cls+'">'+(v==='correct'?'\u2713':(v==='incorrect'?'\u2717':''))+'</div>';
-  }
-  return '<div class="kicks">'+out+'</div>';
+  '</div></div>';
 }
 function hostShootoutView(){
   var s = H.shootout;
   var p0 = H.players.filter(function(p){return p.id===s.order[0];})[0];
   var p1 = H.players.filter(function(p){return p.id===s.order[1];})[0];
   var turnP = s.order[s.currentTurn]===p0.id ? p0 : p1;
-  var stage;
-  if (s.currentQuestion){
-    stage = '<div class="stage"><div class="q-label">'+(s.sudden?'Sudden death \u2014 ':'')+'Reading to '+esc(turnP.name)+'</div>' +
-      '<div class="q-text">'+esc(s.currentQuestion[0])+'</div>' +
-      '<div class="a-text">Answer: '+esc(s.currentQuestion[1])+'</div>' +
-      '<div class="action-row">' +
-        '<button class="act-btn correct" data-action="shootoutMark" data-arg="correct">Correct <span class="kbd">C</span></button>' +
-        '<button class="act-btn incorrect" data-action="shootoutMark" data-arg="incorrect">Incorrect <span class="kbd">I</span></button>' +
-      '</div></div>';
-  } else {
-    stage = '<div class="stage"><div class="q-label">'+(s.sudden?'Sudden death':'Up next')+'</div>' +
-      '<div class="q-text" style="color:var(--blue);">'+esc(turnP.name)+'</div>' +
-      '<div class="action-row"><button class="act-btn primary" data-action="shootoutNextQuestion">Ask next question</button></div></div>';
-  }
-  return topBarHtml() + '<div style="padding:16px 22px;">' +
+  return '<div class="main-compact">' + topBarSimple() +
     '<div class="duel">' +
       '<div class="duel-side'+(s.currentTurn===0?' active':'')+'"><div class="nm">'+esc(p0.name)+'</div>'+kickBoxes(s,0)+'</div>' +
       '<div class="duel-side'+(s.currentTurn===1?' active':'')+'"><div class="nm">'+esc(p1.name)+'</div>'+kickBoxes(s,1)+'</div>' +
     '</div>' +
-    '<div class="panel">'+stage+'</div>' +
+    (s.currentQuestion
+      ? '<div class="stage compact"><div class="q-label">'+(s.sudden?'Sudden death \u2014 ':'')+'Reading to '+esc(turnP.name)+'</div><div class="q-text">'+esc(s.currentQuestion[0])+'</div></div>'
+      : '<div class="stage compact"><div class="q-label">'+(s.sudden?'Sudden death':'Up next')+'</div><div class="q-text" style="color:var(--blue);">'+esc(turnP.name)+'</div></div>') +
   '</div>';
 }
-
-function standingsHtml(players){
-  var sorted = players.slice().sort(function(a,b){
-    if (a.alive !== b.alive) return a.alive ? -1 : 1;
-    return (b.correct-b.incorrect) - (a.correct-a.incorrect);
-  });
-  return '<div class="standings">'+sorted.map(function(p){
-    var acc = accuracyOf(p);
-    return '<div class="r"><span>'+esc(p.name)+'</span><span>'+(acc===null?'\u2014':acc+'%')+' \u00b7 '+p.correct+'\u2713/'+p.incorrect+'\u2717</span></div>';
-  }).join('')+'</div>';
-}
 function hostGameOverView(){
-  return '<div class="gameover">' +
+  return '<div class="gameover main-compact">' +
     '<div class="trophy">\uD83C\uDFC6</div>' +
     '<div class="winner">'+esc(H.winner)+' wins!</div>' +
     '<div class="amt" style="font-family:\'Oswald\',sans-serif;font-size:34px;color:var(--gold);margin-bottom:4px;">'+fmtMoney(H.bank)+'</div>' +
     '<div class="lbl" style="color:var(--muted);font-size:13px;margin-bottom:22px;">Final team bank</div>' +
     standingsHtml(H.players) +
-    '<button class="big-btn gold" style="margin-top:26px;" data-action="playAgain">Play again with same players</button>' +
+  '</div>';
+}
+
+/* ============================== VIEWS: CONTROLLER (2ND SCREEN — HOST CONTROLS) ============================== */
+function controllerRootView(){
+  if (CTRL.error){
+    return '<div class="landing"><div class="error-box">'+esc(CTRL.error)+'</div><button class="big-btn gold" data-action="ctrlRetry">Try again</button></div>';
+  }
+  if (!CTRL.state){
+    return '<div class="landing"><p class="tag">Connecting to the main screen\u2026</p></div>' +
+      (CTRL.connLost ? '<div class="error-box" style="max-width:400px;margin:20px auto 0;">Reconnecting\u2026</div>' : '');
+  }
+  var s = CTRL.state;
+  if (s.phase === 'lobby') return controllerLobbyView(s);
+  if (s.phase === 'playing') return controllerPlayingView(s);
+  if (s.phase === 'voting') return controllerVotingView(s);
+  if (s.phase === 'elimination') return controllerEliminationView(s);
+  if (s.phase === 'shootout') return controllerShootoutView(s);
+  if (s.phase === 'gameover') return controllerGameOverView(s);
+  return '<div class="center-msg">Unknown phase.</div>';
+}
+function ctrlTopBar(s){
+  return '<div class="top-bar"><div class="room-pill">ROOM '+esc(s.roomCode)+'</div><div class="stat-strip"><span class="stat-chip gold"><b>'+fmtMoney(s.bank)+'</b>Bank</span></div></div>';
+}
+function controllerQuestionBankPanel(s){
+  var statusLine = s.usingCustom
+    ? '<span style="color:var(--gold);">Using '+s.questionBankCount+' custom question'+(s.questionBankCount===1?'':'s')+'</span>'
+    : '<span style="color:var(--muted);">Using the '+s.questionBankCount+' built-in questions</span>';
+  var csvSection = ctrlCsvParsedQuestions ? (
+    '<div style="margin-top:10px;font-size:13px;color:var(--gold);">Found '+ctrlCsvParsedQuestions.length+' question'+(ctrlCsvParsedQuestions.length===1?'':'s')+' in '+esc(ctrlCsvFileName)+'</div>' +
+    '<div class="action-row" style="justify-content:flex-start;margin-top:8px;">' +
+      '<button class="act-btn primary" data-action="ctrlUseCSVQuestions">Use these '+ctrlCsvParsedQuestions.length+' questions</button>' +
+      '<button class="act-btn neutral" data-action="ctrlClearCSVPreview">Cancel</button>' +
+    '</div>'
+  ) : '';
+  var bankList = ctrlShowQuestionBank ? ('<div class="qbank-list">' + (CTRL.questionBankCache||[]).map(function(pair,i){
+      return '<div class="qbank-row"><span class="qbank-num">'+(i+1)+'.</span><div><div class="qbank-q">'+esc(pair[0])+'</div><div class="qbank-a">'+esc(pair[1])+'</div></div></div>';
+    }).join('') + '</div>') : '';
+  return '<div class="panel" style="text-align:left;">' +
+    '<h3>Question bank</h3>' +
+    '<p style="font-size:13px;color:var(--muted);margin:0 0 10px;">'+statusLine+
+      ' &middot; <button class="back-link" style="display:inline;padding:0;font-size:13px;color:var(--blue);" data-action="ctrlToggleQuestionBank">'+(ctrlShowQuestionBank?'Hide list':'View all questions')+'</button></p>' +
+    bankList +
+    '<p style="font-size:12px;color:var(--muted);margin:14px 0 6px;">Paste your own, one per line: <code style="color:var(--text);">Question text | Answer text</code></p>' +
+    '<textarea id="ctrlCustomQuestions" rows="5" placeholder="What is the capital of France? | Paris" style="width:100%;padding:12px 14px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--text);font-size:14px;font-family:Inter,sans-serif;resize:vertical;">'+esc(ctrlQuestionsDraft)+'</textarea>' +
+    '<div class="action-row" style="justify-content:flex-start;margin-top:10px;">' +
+      '<button class="act-btn primary" data-action="ctrlSaveCustomQuestions">Use these questions</button>' +
+      (s.usingCustom ? '<button class="act-btn neutral" data-action="ctrlResetQuestions">Reset to built-in</button>' : '') +
+    '</div>' +
+    '<div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--line);">' +
+      '<p style="font-size:12px;color:var(--muted);margin:0 0 8px;">Or upload a CSV file with two columns: question, answer</p>' +
+      '<input type="file" id="ctrlCsvFileInput" accept=".csv,text/csv" style="color:var(--text);font-size:13px;">' +
+      csvSection +
+    '</div>' +
+  '</div>';
+}
+function controllerLobbyView(s){
+  var rows = s.players.map(function(p){
+    return '<div class="chip"><span><span class="dot'+(p.connected?'':' off')+'"></span>'+esc(p.name)+'</span>' +
+      '<button class="kick-btn" data-action="ctrlKickPlayer" data-arg="'+p.id+'" title="Remove player">\u2715</button></div>';
+  }).join('');
+  return '<div class="ctrl-wrap">' +
+    '<div class="top-bar"><div class="room-pill">ROOM '+esc(s.roomCode)+'</div><div class="stat-strip"><span class="stat-chip"><b>'+s.players.length+'</b>Joined</span></div></div>' +
+    '<div class="panel"><h3>Players</h3><div class="roster">'+(rows||'<p class="center-msg" style="padding:10px;">Waiting for players\u2026</p>')+'</div>' +
+      '<div class="action-row" style="justify-content:flex-start;margin-top:10px;">' +
+        '<input id="addPlayerInput" placeholder="Add a player without a device" style="flex:1;min-width:160px;padding:10px 12px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--text);">' +
+        '<button class="act-btn neutral" data-action="ctrlAddPlayer">Add</button>' +
+      '</div>' +
+    '</div>' +
+    controllerQuestionBankPanel(s) +
+    '<button class="big-btn gold full-btn" data-action="ctrlStartGame" '+(s.players.length<3?'disabled':'')+'>Start game ('+s.players.length+' joined'+(s.players.length<3?', need 3+':'')+')</button>' +
+  '</div>';
+}
+function controllerPlayingView(s){
+  var stageInner;
+  if (s.currentQuestion){
+    stageInner =
+      '<div class="ctrl-asked">'+esc(s.askedName||'')+'</div>' +
+      '<div class="q-text">'+esc(s.currentQuestion.q)+'</div>' +
+      '<div class="a-text">'+esc(s.currentQuestion.a)+'</div>' +
+      '<div class="action-row">' +
+        '<button class="act-btn correct" data-action="ctrlMarkCorrect">Correct <span class="kbd">C</span></button>' +
+        '<button class="act-btn incorrect" data-action="ctrlMarkIncorrect">Incorrect <span class="kbd">I</span></button>' +
+      '</div>' +
+      '<div class="action-row" style="margin-top:8px;"><button class="act-btn neutral" data-action="ctrlNextQuestion">Skip \u2014 new question</button></div>';
+  } else {
+    stageInner =
+      '<div class="ctrl-asked" style="color:var(--blue);">'+esc(s.askedName||'\u2014')+'</div>' +
+      '<div class="action-row"><button class="act-btn primary" data-action="ctrlNextQuestion">Ask next question</button></div>';
+  }
+  return '<div class="ctrl-wrap">' +
+    '<div class="top-bar"><div class="room-pill">ROOM '+esc(s.roomCode)+'</div><div class="stat-strip"><span class="stat-chip"><b>'+s.round+'</b>Round</span></div></div>' +
+    bigTimerHtml() +
+    '<div class="panel">'+stageInner+'</div>' +
+    '<div class="panel"><h3>Chain</h3>'+ladderHtml(s.chainIndex)+
+      '<div class="bank-total"><div class="amt">'+fmtMoney(s.bank)+'</div><div class="lbl">Team bank</div></div>' +
+      (s.bankCallPending ? '<div class="banner" style="margin-top:10px;">\uD83D\uDD14 '+esc(s.askedName||'')+' wants to bank!</div>' : '') +
+      '<button class="act-btn bank full-btn" data-action="ctrlBankChain" '+(s.chainIndex<0?'disabled':'')+'>Bank '+(s.chainIndex>=0?fmtMoney(s.chainValue):'')+'</button>' +
+    '</div>' +
+    '<div class="panel"><h3>Players \u2014 tap to choose who\'s asked (with accuracy)</h3>'+controllerRoster(s.players, s.currentAskedId, true)+'</div>' +
+    '<button class="act-btn neutral full-btn" data-action="ctrlEndRound">End round now</button>' +
+  '</div>';
+}
+function controllerVotingView(s){
+  var alive = s.players.filter(function(p){return p.alive;});
+  if (s.tieCandidates){
+    var cands = s.players.filter(function(p){return s.tieCandidates.indexOf(p.id)>=0;});
+    return '<div class="ctrl-wrap">' + ctrlTopBar(s) +
+      '<div class="panel" style="text-align:center;"><h2>It\'s a tie</h2><p class="tag">Performance stats didn\'t break it either. Pick who goes home:</p>' +
+      '<div class="action-row">'+cands.map(function(p){ return '<button class="act-btn incorrect" data-action="ctrlManualTieBreak" data-arg="'+p.id+'">'+esc(p.name)+'</button>'; }).join('')+'</div></div></div>';
+  }
+  if (s.revealing && s.revealInfo){
+    var isLast = s.revealInfo.index === s.revealOrder.length - 1;
+    return '<div class="ctrl-wrap">' + ctrlTopBar(s) +
+      '<div class="panel" style="text-align:center;">' +
+        '<p class="tag">Revealing vote '+(s.revealInfo.index+1)+' of '+s.revealInfo.total+'</p>' +
+        '<div class="q-label">'+esc(s.revealInfo.voterName)+' voted for</div>' +
+        '<div class="name" style="color:var(--gold);font-family:\'Oswald\',sans-serif;font-size:26px;">'+(s.revealInfo.votedForName?esc(s.revealInfo.votedForName):'No one')+'</div>' +
+        '<button class="big-btn gold" style="margin-top:16px;" data-action="ctrlAdvanceReveal">'+(isLast?'Show result':'Reveal next vote')+'</button>' +
+      '</div></div>';
+  }
+  return '<div class="ctrl-wrap">' + ctrlTopBar(s) +
+    '<div class="panel" style="text-align:center;"><h3>Voting</h3><p class="tag">'+s.votedCount+' of '+alive.length+' voted</p>' +
+    '<button class="big-btn gold" data-action="ctrlStartVoteReveal">Reveal votes</button></div></div>';
+}
+function controllerEliminationView(s){
+  var e = s.lastElimination;
+  var aliveCount = s.players.filter(function(p){return p.alive;}).length;
+  return '<div class="ctrl-wrap">' + ctrlTopBar(s) +
+    '<div class="elim-card"><div class="q-label">Voted off</div><div class="name">'+esc(e.name)+'</div>' +
+    (e.note?'<p class="tag">'+esc(e.note)+'</p>':'') +
+    '<div class="tally">'+e.tally.map(function(t){ return '<div class="r"><span>'+esc(t.name)+'</span><span>'+t.votes+' vote'+(t.votes===1?'':'s')+'</span></div>'; }).join('')+'</div>' +
+    '<button class="big-btn gold" data-action="ctrlContinueAfterElimination">'+(aliveCount===2?'Continue to final shootout':'Continue to next round')+'</button>' +
+  '</div></div>';
+}
+function controllerShootoutView(s){
+  var sh = s.shootout;
+  var p0 = sh.order[0], p1 = sh.order[1];
+  var turnName = sh.order[sh.currentTurn].name;
+  var stageInner;
+  if (sh.currentQuestion){
+    stageInner = '<div class="ctrl-asked">'+(sh.sudden?'Sudden death \u2014 ':'')+esc(turnName)+'</div>' +
+      '<div class="q-text">'+esc(sh.currentQuestion.q)+'</div>' +
+      '<div class="a-text">'+esc(sh.currentQuestion.a)+'</div>' +
+      '<div class="action-row">' +
+        '<button class="act-btn correct" data-action="ctrlShootoutMark" data-arg="correct">Correct <span class="kbd">C</span></button>' +
+        '<button class="act-btn incorrect" data-action="ctrlShootoutMark" data-arg="incorrect">Incorrect <span class="kbd">I</span></button>' +
+      '</div>';
+  } else {
+    stageInner = '<div class="ctrl-asked" style="color:var(--blue);">'+(sh.sudden?'Sudden death':'Up next')+': '+esc(turnName)+'</div>' +
+      '<div class="action-row"><button class="act-btn primary" data-action="ctrlShootoutNextQuestion">Ask next question</button></div>';
+  }
+  return '<div class="ctrl-wrap">' + ctrlTopBar(s) +
+    '<div class="duel">' +
+      '<div class="duel-side'+(sh.currentTurn===0?' active':'')+'"><div class="nm">'+esc(p0.name)+'</div>'+kickBoxes(sh,0)+'</div>' +
+      '<div class="duel-side'+(sh.currentTurn===1?' active':'')+'"><div class="nm">'+esc(p1.name)+'</div>'+kickBoxes(sh,1)+'</div>' +
+    '</div>' +
+    '<div class="panel">'+stageInner+'</div>' +
+  '</div>';
+}
+function controllerGameOverView(s){
+  return '<div class="ctrl-wrap gameover">' +
+    '<div class="trophy">\uD83C\uDFC6</div>' +
+    '<div class="winner">'+esc(s.winner)+' wins!</div>' +
+    '<div class="amt" style="font-family:\'Oswald\',sans-serif;font-size:30px;color:var(--gold);margin-bottom:4px;">'+fmtMoney(s.bank)+'</div>' +
+    '<div class="lbl" style="color:var(--muted);font-size:13px;margin-bottom:18px;">Final team bank</div>' +
+    standingsHtml(s.players) +
+    '<button class="big-btn gold" style="margin-top:26px;" data-action="ctrlPlayAgain">Play again with same players</button>' +
   '</div>';
 }
 
@@ -1275,15 +1486,13 @@ function playerRootView(){
     return '<div class="landing"><p class="tag">Connecting to the host\u2026</p></div>';
   }
   var s = P.state;
+  var me = s.players.filter(function(p){return p.id===s.myId;})[0] || {correct:0,incorrect:0,alive:true,name:P.myName};
   var wrap = '<div class="player-wrap">' +
     '<div class="p-header"><div class="rc">ROOM '+esc(s.roomCode)+'</div></div>' +
     (P.connLost ? '<div class="error-box">Connection to host lost. Trying to reconnect\u2026 <button class="back-link" style="display:inline;padding:0;color:var(--blue);" data-action="reconnectNow">Reconnect now</button></div>' : '');
 
-  var me = s.players.filter(function(p){return p.id===s.myId;})[0] || {correct:0,incorrect:0,alive:true};
-  var acc = accuracyOf(me);
-
   var body;
-  if (s.phase === 'lobby') body = playerLobbyView(s);
+  if (s.phase === 'lobby') body = playerLobbyView(s, me);
   else if (s.phase === 'playing') body = playerPlayingView(s, me);
   else if (s.phase === 'voting') body = playerVotingView(s, me);
   else if (s.phase === 'elimination') body = playerEliminationView(s, me);
@@ -1291,14 +1500,19 @@ function playerRootView(){
   else if (s.phase === 'gameover') body = playerGameOverView(s, me);
   else body = '<div class="center-msg">Waiting\u2026</div>';
 
-  return wrap + body + '<div class="footer-note">You are '+esc(P.myName)+'</div></div>';
+  return wrap + body + '<div class="footer-note">You are '+esc(me.name)+'</div></div>';
 }
 
-function playerLobbyView(s){
-  var list = s.players.map(function(p){ return '<div class="chip"><span><span class="dot'+(p.connected?'':' off')+'"></span>'+esc(p.name)+'</span></div>'; }).join('');
-  return '<div class="panel"><h3>Waiting for the host to start\u2026</h3><div class="roster">'+list+'</div></div>';
+function playerLobbyView(s, me){
+  var list = s.players.map(function(p){ return '<div class="chip"><span><span class="dot'+(p.connected?'':' off')+'"></span>'+esc(p.name)+(p.id===s.myId?' (you)':'')+'</span></div>'; }).join('');
+  return '<div class="panel"><h3>Waiting for the host to start\u2026</h3><div class="roster">'+list+'</div></div>' +
+    '<div class="panel">' +
+      '<h3>Change your name</h3>' +
+      (P.renameError ? '<p style="color:var(--red);font-size:13px;margin:0 0 8px;">'+esc(P.renameError)+'</p>' : '') +
+      '<input id="renameInput" maxlength="18" value="'+esc(me.name)+'" style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--text);margin-bottom:10px;">' +
+      '<button class="act-btn primary full-btn" data-action="renameMe">Save name</button>' +
+    '</div>';
 }
-
 function playerStatsHtml(me){
   var acc = accuracyOf(me);
   return '<div class="p-stats">' +
@@ -1317,7 +1531,6 @@ function allPlayersAccuracyTable(players){
     return '<div class="chip'+(!p.alive?' dead':'')+'"><span>'+esc(p.name)+'</span><span class="sub">'+(acc===null?'\u2014':acc+'%')+' \u00b7 '+p.correct+'\u2713/'+p.incorrect+'\u2717</span></div>';
   }).join('') + '</div></div>';
 }
-
 function playerPlayingView(s, me){
   if (!me.alive){
     return '<div class="spectator-tag">You\'ve been voted off \u2014 spectating</div>' +
@@ -1326,9 +1539,7 @@ function playerPlayingView(s, me){
   }
   var isMyTurn = s.currentAskedId === s.myId;
   var askedPlayer = s.players.filter(function(p){return p.id===s.currentAskedId;})[0];
-  var remain = s.timer.running ? fmtClock(s.timer.endsAt - Date.now()) : '--:--';
-  var low = s.timer.running && (s.timer.endsAt - Date.now()) < 10000;
-  var out = '<div class="timer-ring'+(low?' low':'')+'">'+remain+'</div>';
+  var out = bigTimerHtml();
   out += playerStatsHtml(me);
   out += '<div class="turn-flag '+(isMyTurn?'yours':'theirs')+'">'+(isMyTurn ? "You're on the spot!" : (askedPlayer?esc(askedPlayer.name)+' is answering':'\u2014'))+'</div>';
   if (s.currentQuestion) out += '<div class="panel" style="text-align:center;"><div class="q-label">Question</div><div class="q-text" style="font-size:19px;">'+esc(s.currentQuestion.q)+'</div></div>';
@@ -1338,7 +1549,6 @@ function playerPlayingView(s, me){
   }
   return out;
 }
-
 function playerVotingView(s, me){
   if (s.revealing && s.revealInfo){
     return (!me.alive ? '<div class="spectator-tag">You\'ve been voted off \u2014 spectating</div>' : '') +
@@ -1357,10 +1567,9 @@ function playerVotingView(s, me){
   var options = s.players.filter(function(p){return p.alive && p.id!==s.myId;});
   var opts = '<option value="">Choose a player\u2026</option>' + options.map(function(p){ return '<option value="'+p.id+'">'+esc(p.name)+'</option>'; }).join('');
   return '<div class="panel" style="text-align:center;"><h3>Who\'s the weakest link?</h3>' +
-    '<select id="voteSelect" class="vote-select">'+opts+'</select>' +
+    '<select id="voteSelect" class="vote-select" style="width:100%;padding:14px;border-radius:10px;background:var(--panel-2);color:var(--text);border:1px solid var(--line);font-size:16px;margin-bottom:12px;">'+opts+'</select>' +
     '<button class="full-btn act-btn incorrect" data-action="submitVote">Submit vote</button></div>';
 }
-
 function playerEliminationView(s, me){
   var e = s.lastElimination;
   return '<div class="elim-card"><div class="q-label">Voted off</div><div class="name">'+esc(e.name)+'</div>' +
@@ -1369,7 +1578,6 @@ function playerEliminationView(s, me){
     (me.alive ? '<p class="tag">Get ready for the next round\u2026</p>' : '<div class="spectator-tag">You\'re spectating the rest of the game</div>') +
   '</div>' + (me.alive ? '' : allPlayersAccuracyTable(s.players));
 }
-
 function playerShootoutView(s, me){
   var sh = s.shootout;
   var mine = sh.order.filter(function(o){return o.id===s.myId;}).length>0;
@@ -1393,59 +1601,13 @@ function playerShootoutView(s, me){
   }
   return out;
 }
-
 function playerGameOverView(s, me){
-  var myName = (s.players.filter(function(p){return p.id===s.myId;})[0]||{}).name;
-  var won = s.winner === myName;
+  var won = s.winner === me.name;
   return '<div class="gameover"><div class="trophy">\uD83C\uDFC6</div><div class="winner">'+esc(s.winner)+' wins!</div>' +
     '<div class="amt" style="font-family:\'Oswald\',sans-serif;font-size:30px;color:var(--gold);margin-bottom:4px;">'+fmtMoney(s.bank)+'</div>' +
     '<div class="lbl" style="color:var(--muted);font-size:13px;margin-bottom:18px;">Final team bank</div>' +
     (won ? '<p class="tag">That\'s you \uD83C\uDF89</p>' : '<p class="tag">Thanks for playing!</p>') +
     standingsHtml(s.players) +
-  '</div>';
-}
-
-/* ============================== VIEWS: ANSWER VIEW (2ND SCREEN) ============================== */
-function answerViewRootView(){
-  if (AV.error){
-    return '<div class="landing"><div class="error-box">'+esc(AV.error)+'</div><button class="big-btn gold" data-action="retryAnswerView">Try again</button></div>';
-  }
-  if (!AV.state){
-    return '<div class="landing"><p class="tag">Connecting to the host\u2026</p></div>' + (AV.connLost ? '<div class="error-box" style="max-width:400px;margin:0 auto;">Reconnecting\u2026</div>' : '');
-  }
-  var s = AV.state;
-  var body;
-  if (s.phase === 'playing'){
-    if (s.currentQuestion){
-      body = '<div class="av-label">Reading to '+esc(s.askedName||'')+'</div>' +
-        '<div class="av-question">'+esc(s.currentQuestion.q)+'</div>' +
-        '<div class="av-answer">'+esc(s.currentQuestion.a)+'</div>';
-    } else {
-      body = '<div class="av-label">On the spot</div><div class="av-turn">'+esc(s.askedName||'\u2014')+'</div>';
-    }
-    if (s.bankCallPending) body += '<div class="banner" style="margin-top:20px;">\uD83D\uDD14 '+esc(s.askedName||'')+' wants to bank!</div>';
-  } else if (s.phase === 'shootout' && s.shootout){
-    var sh = s.shootout;
-    var turnName = sh.order[sh.currentTurn] ? sh.order[sh.currentTurn].name : '';
-    if (sh.currentQuestion){
-      body = '<div class="av-label">'+(sh.sudden?'Sudden death \u2014 ':'')+'Reading to '+esc(turnName)+'</div>' +
-        '<div class="av-question">'+esc(sh.currentQuestion.q)+'</div>' +
-        '<div class="av-answer">'+esc(sh.currentQuestion.a)+'</div>';
-    } else {
-      body = '<div class="av-label">Up next</div><div class="av-turn">'+esc(turnName)+'</div>';
-    }
-  } else if (s.phase === 'voting'){
-    body = '<div class="av-label">Voting in progress</div><div class="av-turn">Who\'s the weakest link?</div>';
-  } else if (s.phase === 'elimination'){
-    body = '<div class="av-label">Voted off</div><div class="av-turn">'+esc(s.lastElimination?s.lastElimination.name:'')+'</div>';
-  } else if (s.phase === 'gameover'){
-    body = '<div class="av-label">Game over</div><div class="av-turn">\uD83C\uDFC6 '+esc(s.winner||'')+'</div>';
-  } else {
-    body = '<div class="av-label">Waiting for the game to start\u2026</div>';
-  }
-  return '<div class="av-wrap">' +
-    '<div style="position:absolute;top:16px;left:16px;color:var(--muted);font-size:12px;">ROOM '+esc(s.roomCode)+' \u00b7 Bank '+fmtMoney(s.bank)+'</div>' +
-    body +
   '</div>';
 }
 
@@ -1455,12 +1617,12 @@ function render(){
   if (role === null){
     if (localView === 'hostSetup') html = hostSetupView();
     else if (localView === 'playerSetup') html = playerSetupView();
-    else if (localView === 'answerViewSetup') html = answerViewSetupView();
+    else if (localView === 'controllerSetup') html = controllerSetupView();
     else html = landingView();
   } else if (role === 'host'){
     html = hostRootView();
-  } else if (role === 'answerView'){
-    html = answerViewRootView();
+  } else if (role === 'controller'){
+    html = controllerRootView();
   } else {
     html = playerRootView();
   }
@@ -1468,21 +1630,21 @@ function render(){
 }
 
 document.addEventListener('input', function(e){
-  if (e.target && e.target.id === 'customQuestions') customQuestionsDraft = e.target.value;
+  if (e.target && e.target.id === 'ctrlCustomQuestions') ctrlQuestionsDraft = e.target.value;
 });
 document.addEventListener('change', function(e){
-  if (!e.target || e.target.id !== 'csvFileInput') return;
+  if (!e.target || e.target.id !== 'ctrlCsvFileInput') return;
   var file = e.target.files && e.target.files[0];
   if (!file) return;
   var reader = new FileReader();
   reader.onload = function(ev){
     var parsed = parseCSVQuestions(ev.target.result);
-    csvParsedQuestions = parsed;
-    csvFileName = file.name;
+    ctrlCsvParsedQuestions = parsed;
+    ctrlCsvFileName = file.name;
     render();
   };
   reader.onerror = function(){
-    csvParsedQuestions = null; csvFileName = null;
+    ctrlCsvParsedQuestions = null; ctrlCsvFileName = null;
     alert('Could not read that file. Make sure it\'s a plain .csv file.');
     render();
   };
@@ -1496,20 +1658,21 @@ document.addEventListener('click', function(e){
   if (Actions[action]) Actions[action](arg, el);
 });
 
-/* Keyboard shortcuts for the host: C = correct, I = incorrect */
+/* Keyboard shortcuts live on the CONTROLLER (that's where marking happens now): C = correct, I = incorrect */
 document.addEventListener('keydown', function(e){
-  if (role !== 'host' || !H) return;
+  if (role !== 'controller' || !CTRL.state) return;
   if (e.repeat) return; // ignore OS key-repeat while held, to avoid double-marking
   var tag = (document.activeElement && document.activeElement.tagName) || '';
   if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
   var key = e.key ? e.key.toLowerCase() : '';
   if (key !== 'c' && key !== 'i') return;
-  if (H.phase === 'playing' && H.currentQuestion){
+  var s = CTRL.state;
+  if (s.phase === 'playing' && s.currentQuestion){
     e.preventDefault();
-    if (key === 'c') Actions.markCorrect(); else Actions.markIncorrect();
-  } else if (H.phase === 'shootout' && H.shootout && H.shootout.currentQuestion){
+    if (key === 'c') Actions.ctrlMarkCorrect(); else Actions.ctrlMarkIncorrect();
+  } else if (s.phase === 'shootout' && s.shootout && s.shootout.currentQuestion){
     e.preventDefault();
-    Actions.shootoutMark(key === 'c' ? 'correct' : 'incorrect');
+    Actions.ctrlShootoutMark(key === 'c' ? 'correct' : 'incorrect');
   }
 });
 
