@@ -70,6 +70,12 @@ input,select,textarea{font-family:'Inter',sans-serif;}
 .big-timer{font-family:'Oswald',sans-serif;font-size:clamp(46px,11vw,68px);text-align:center;color:var(--blue);line-height:1;margin:2px 0 12px;font-variant-numeric:tabular-nums;}
 .big-timer.low{color:var(--red);}
 
+/* pre-round countdown */
+.countdown-block{text-align:center;padding:22px 0;}
+.countdown-label{color:var(--muted);font-size:15px;margin-bottom:6px;}
+.big-countdown{font-family:'Oswald',sans-serif;font-size:clamp(64px,16vw,110px);color:var(--gold);line-height:1;font-variant-numeric:tabular-nums;}
+.countdown-sub{color:var(--blue);font-size:16px;margin-top:10px;}
+
 /* compact horizontal chain ladder (used everywhere) */
 .ladder-h{display:flex;gap:5px;flex-wrap:wrap;justify-content:center;margin:8px 0;}
 .rung-h{padding:5px 9px;border-radius:6px;background:var(--panel-2);color:var(--muted);font-family:'Oswald',sans-serif;font-size:12px;transition:.2s;}
@@ -234,7 +240,7 @@ var hostControllerConns = []; // DataConnections for connected controller device
 var P = {                  // player-side local wrapper
   conn: null, roomCode: '', myName: '', myId: null,
   state: null, error: null, denied: null, connLost: false,
-  localVoted: false, bankFlash: false, renameError: null
+  localVoted: false, voteDraft: null, bankFlash: false, renameError: null
 };
 
 var CTRL = {                // controller-side local wrapper (no authoritative state, just a mirror)
@@ -244,6 +250,20 @@ var ctrlQuestionsDraft = ''; // mirrors the controller's custom-question textare
 var ctrlCsvParsedQuestions = null;
 var ctrlCsvFileName = null;
 var ctrlShowQuestionBank = false;
+var ctrlLinkCopied = false;
+var pendingJoinCode = ''; // pre-filled room code from a shared ?join=CODE link
+
+function getQueryParam(name){
+  try{
+    var params = new URLSearchParams(window.location.search);
+    return params.get(name);
+  } catch(e){ return null; }
+}
+function buildInviteLink(code){
+  try{
+    return window.location.origin + window.location.pathname + '?join=' + code;
+  } catch(e){ return '?join=' + code; }
+}
 
 /* ============================== HOST STATE ============================== */
 function newHostState(){
@@ -255,7 +275,8 @@ function newHostState(){
     timer:{endsAt:0,duration:60,running:false},
     votes:{}, lastElimination:null, tieCandidates:null, tieTally:null,
     revealing:false, revealOrder:null, revealIndex:0,
-    bankCallPending:false, shootout:null, winner:null,
+    countdownEndsAt:0, _countdownTarget:null,
+    shootout:null, winner:null,
     log:[], _deck:[], questionBank:QUESTIONS.slice(), usingCustom:false
   };
 }
@@ -437,9 +458,7 @@ function handleIncomingHostMessage(conn, msg){
     broadcastState(); render();
   } else if (msg.type === 'callBank'){
     if (H.phase === 'playing' && H.currentAskedId === player.id){
-      H.bankCallPending = true;
-      pushLog('\uD83D\uDD14 ' + player.name + ' wants to bank!');
-      broadcastState(); render();
+      doBankChain(player.name);
     }
   } else if (msg.type === 'rename'){
     if (H.phase !== 'lobby') return;
@@ -498,7 +517,7 @@ function sanitizeForPlayer(forPlayer){
     bank: H.bank, round: H.round,
     currentAskedId: H.currentAskedId,
     currentQuestion: H.currentQuestion ? {q:H.currentQuestion[0]} : null,
-    timer: H.timer,
+    timer: H.timer, countdownEndsAt: H.countdownEndsAt,
     myId: forPlayer.id,
     votedAlready: !!H.votes[forPlayer.id],
     revealing: H.revealing, revealInfo: revealInfo,
@@ -523,8 +542,7 @@ function sanitizeForController(){
     chainIndex: H.chainIndex, chainValue: H.chainIndex>=0?CHAIN_VALUES[H.chainIndex]:0, bank: H.bank,
     currentAskedId: H.currentAskedId, askedName: askedPlayer?askedPlayer.name:null,
     currentQuestion: H.currentQuestion ? {q:H.currentQuestion[0], a:H.currentQuestion[1]} : null,
-    timer: H.timer,
-    bankCallPending: H.bankCallPending,
+    timer: H.timer, countdownEndsAt: H.countdownEndsAt,
     votedCount: Object.keys(H.votes).length,
     revealing: H.revealing, revealOrder: H.revealOrder, revealIndex: H.revealIndex, revealInfo: revealInfo,
     tieCandidates: H.tieCandidates,
@@ -560,14 +578,35 @@ function startTimer(){
   H.timer = {duration:H.roundDuration, endsAt: Date.now() + H.roundDuration*1000, running:true};
 }
 
+function beginCountdown(target){
+  H.phase = 'countdown';
+  H.countdownEndsAt = Date.now() + 5000;
+  H._countdownTarget = target; // 'round' | 'shootout'
+  broadcastState(); render();
+}
+function finishCountdown(){
+  var target = H._countdownTarget;
+  H._countdownTarget = null;
+  if (target === 'shootout'){
+    H.phase = 'shootout';
+    H.shootout.currentQuestion = pullQuestion();
+    pushLog('Penalty shootout begins');
+  } else {
+    H.phase = 'playing';
+    H.currentQuestion = pullQuestion();
+    startTimer();
+    pushLog('Round ' + H.round + ' begins');
+  }
+  broadcastState(); render();
+}
+
 function doStartGame(){
   if (H.players.length < 3) return;
-  H.phase = 'playing'; H.round = 1; H.chainIndex = -1;
+  H.round = 1; H.chainIndex = -1;
   H.currentAskedId = H.players[0].id;
-  H.currentQuestion = pullQuestion();
-  startTimer();
+  H.currentQuestion = null;
   pushLog('Game started with ' + H.players.length + ' players');
-  broadcastState(); render();
+  beginCountdown('round');
 }
 function doSelectAsked(playerId){
   if (H.phase !== 'playing') return;
@@ -575,13 +614,11 @@ function doSelectAsked(playerId){
   if (!p) return;
   H.currentAskedId = playerId;
   H.currentQuestion = pullQuestion();
-  H.bankCallPending = false;
   broadcastState(); render();
 }
 function doNextQuestion(){
   if (H.phase !== 'playing' || !H.currentAskedId) return;
   H.currentQuestion = pullQuestion();
-  H.bankCallPending = false;
   broadcastState(); render();
 }
 function doMarkCorrect(){
@@ -592,7 +629,6 @@ function doMarkCorrect(){
   pushLog('\u2705 ' + p.name + ' correct \u2014 chain at ' + fmtMoney(CHAIN_VALUES[H.chainIndex]));
   advanceTurn();
   H.currentQuestion = pullQuestion();
-  H.bankCallPending = false;
   broadcastState(); render();
 }
 function doMarkIncorrect(){
@@ -603,16 +639,14 @@ function doMarkIncorrect(){
   H.chainIndex = -1;
   advanceTurn();
   H.currentQuestion = pullQuestion();
-  H.bankCallPending = false;
   broadcastState(); render();
 }
-function doBankChain(){
+function doBankChain(bankerName){
   if (H.phase !== 'playing' || H.chainIndex < 0) return;
   var amt = CHAIN_VALUES[H.chainIndex];
   H.bank += amt;
-  pushLog('\uD83C\uDFE6 Banked ' + fmtMoney(amt) + ' \u2014 total bank ' + fmtMoney(H.bank));
+  pushLog('\uD83C\uDFE6 ' + (bankerName ? bankerName + ' banked ' : 'Banked ') + fmtMoney(amt) + ' \u2014 total bank ' + fmtMoney(H.bank));
   H.chainIndex = -1;
-  H.bankCallPending = false;
   broadcastState(); render();
 }
 function doEndRound(){
@@ -687,15 +721,14 @@ function doManualTieBreak(playerId){
 function doContinueAfterElimination(){
   var alive = H.players.filter(function(p){return p.alive;});
   if (alive.length === 2){
-    H.phase = 'shootout';
-    H.shootout = {order:[alive[0].id, alive[1].id], rounds:[], currentRoundIndex:0, currentTurn:0, currentQuestion:pullQuestion(), sudden:false, winnerId:null};
-    pushLog('Final 2! Penalty shootout begins');
+    H.shootout = {order:[alive[0].id, alive[1].id], rounds:[], currentRoundIndex:0, currentTurn:0, currentQuestion:null, sudden:false, winnerId:null};
+    pushLog('Final 2! Get ready for the penalty shootout');
+    beginCountdown('shootout');
   } else {
-    H.phase = 'playing'; H.round++; H.chainIndex = -1;
-    H.currentAskedId = alive[0].id; H.currentQuestion = pullQuestion();
-    startTimer();
+    H.round++; H.chainIndex = -1;
+    H.currentAskedId = alive[0].id; H.currentQuestion = null;
+    beginCountdown('round');
   }
-  broadcastState(); render();
 }
 
 /* ---- shootout ---- */
@@ -808,6 +841,22 @@ function doResetQuestionBank(){
   broadcastState(); render();
 }
 
+function doCloseRoom(){
+  H.players.forEach(function(p){
+    var conn = hostConns[p.id];
+    if (conn && conn.open){ try{ conn.send({type:'roomClosed'}); }catch(e){} }
+  });
+  hostControllerConns.forEach(function(conn){
+    if (conn && conn.open){ try{ conn.send({type:'roomClosed'}); }catch(e){} }
+  });
+  setTimeout(function(){
+    try{ if (peer) peer.destroy(); }catch(e){}
+    hostConns = {}; hostControllerConns = [];
+    role = null; H = null; localView = 'landing';
+    render();
+  }, 400); // brief pause so the roomClosed notice actually reaches everyone before the transport tears down
+}
+
 var CONTROL_ACTIONS = {
   startGame: function(){ doStartGame(); },
   selectAsked: function(arg){ doSelectAsked(arg); },
@@ -827,29 +876,47 @@ var CONTROL_ACTIONS = {
   addPlayer: function(arg){ doAddPlayer(arg); },
   setQuestionBank: function(arg){ doSetQuestionBank(arg); },
   resetQuestionBank: function(){ doResetQuestionBank(); },
-  requestQuestionBank: function(arg, conn){ if (conn && conn.open) conn.send({type:'questionBankData', questions: H.questionBank}); }
+  requestQuestionBank: function(arg, conn){ if (conn && conn.open) conn.send({type:'questionBankData', questions: H.questionBank}); },
+  closeRoom: function(){ doCloseRoom(); }
 };
 
 setInterval(function(){
-  if (H && H.phase === 'playing' && H.timer.running && Date.now() >= H.timer.endsAt){
+  if (!H) return;
+  if (H.phase === 'countdown' && Date.now() >= H.countdownEndsAt){
+    finishCountdown();
+  } else if (H.phase === 'playing' && H.timer.running && Date.now() >= H.timer.endsAt){
     doEndRound();
   }
 }, 500);
 
-/* Lightweight timer ticker: updates ONLY the big countdown text/color directly in the DOM,
-   never calling render(), so the rest of the screen (podiums etc.) never re-mounts and
+/* Lightweight timer ticker: updates ONLY the big countdown/round-timer text directly in the
+   DOM, never calling render(), so the rest of the screen (podiums etc.) never re-mounts and
    never flickers while everyone is just waiting on a mark. */
 function tickLiveTimers(){
-  var endsAt = null, running = false;
-  if (role === 'host' && H && H.phase === 'playing'){ endsAt = H.timer.endsAt; running = H.timer.running; }
-  else if (role === 'controller' && CTRL.state && CTRL.state.phase === 'playing'){ endsAt = CTRL.state.timer.endsAt; running = CTRL.state.timer.running; }
-  else if (role === 'player' && P.state && P.state.phase === 'playing'){ endsAt = P.state.timer.endsAt; running = P.state.timer.running; }
+  var endsAt = null, running = false, cdEndsAt = null;
+  if (role === 'host' && H){
+    if (H.phase === 'playing'){ endsAt = H.timer.endsAt; running = H.timer.running; }
+    if (H.phase === 'countdown'){ cdEndsAt = H.countdownEndsAt; }
+  } else if (role === 'controller' && CTRL.state){
+    if (CTRL.state.phase === 'playing'){ endsAt = CTRL.state.timer.endsAt; running = CTRL.state.timer.running; }
+    if (CTRL.state.phase === 'countdown'){ cdEndsAt = CTRL.state.countdownEndsAt; }
+  } else if (role === 'player' && P.state){
+    if (P.state.phase === 'playing'){ endsAt = P.state.timer.endsAt; running = P.state.timer.running; }
+    if (P.state.phase === 'countdown'){ cdEndsAt = P.state.countdownEndsAt; }
+  }
   var text = running ? fmtClock(endsAt - Date.now()) : '--:--';
   var low = running && (endsAt - Date.now()) < 10000;
   var nodes = document.querySelectorAll('.js-timer');
   for (var i = 0; i < nodes.length; i++){
     nodes[i].textContent = text;
     if (low) nodes[i].classList.add('low'); else nodes[i].classList.remove('low');
+  }
+  if (cdEndsAt !== null){
+    var secsLeft = Math.max(0, Math.ceil((cdEndsAt - Date.now())/1000));
+    var cdNodes = document.querySelectorAll('.js-countdown');
+    for (var j = 0; j < cdNodes.length; j++){
+      cdNodes[j].textContent = secsLeft > 0 ? String(secsLeft) : 'GO!';
+    }
   }
 }
 setInterval(tickLiveTimers, 500);
@@ -898,7 +965,7 @@ function connectPlayerToHost(code, name){
     conn.on('data', function(d){ handleHostMessage(d); });
     conn.on('close', function(){
       P.connLost = true; render();
-      if (role === 'player' && !P.error) scheduleReconnect(code, name);
+      if (role === 'player' && !P.error && !P.denied) scheduleReconnect(code, name);
     });
   }
   if (peer && !peer.destroyed && peer.open){
@@ -944,7 +1011,7 @@ Actions.reconnectNow = function(){
 };
 Actions.retryJoin = function(){
   localView = 'playerSetup'; role = null; clearPlayerSession();
-  P = {conn:null,roomCode:'',myName:'',myId:null,state:null,error:null,denied:null,connLost:false,localVoted:false,bankFlash:false,renameError:null};
+  P = {conn:null,roomCode:'',myName:'',myId:null,state:null,error:null,denied:null,connLost:false,localVoted:false,voteDraft:null,bankFlash:false,renameError:null};
   render();
 };
 
@@ -957,6 +1024,10 @@ function handleHostMessage(msg){
   } else if (msg.type === 'state'){
     P.state = msg.state;
     P.connLost = false;
+    // A round's vote is only ever meaningful while phase==='voting'; once we leave that phase
+    // (round ends, or a fresh game starts via Play Again) clear the local flags so a stale
+    // "already voted" from a previous round/game never blocks the next vote.
+    if (msg.state.phase !== 'voting'){ P.localVoted = false; P.voteDraft = null; }
     render();
   } else if (msg.type === 'denied'){
     P.denied = msg.reason;
@@ -964,6 +1035,10 @@ function handleHostMessage(msg){
     render();
   } else if (msg.type === 'kicked'){
     P.denied = 'You were removed from the game by the host.';
+    clearPlayerSession();
+    render();
+  } else if (msg.type === 'roomClosed'){
+    P.denied = 'The host has closed this room.';
     clearPlayerSession();
     render();
   } else if (msg.type === 'renameFailed'){
@@ -976,6 +1051,7 @@ Actions.submitVote = function(){
   if (!sel || !sel.value) return;
   P.conn.send({type:'vote', targetId: sel.value});
   P.localVoted = true;
+  P.voteDraft = null;
   render();
 };
 Actions.callBank = function(){
@@ -1010,7 +1086,7 @@ function connectControllerToHost(code){
     conn.on('data', function(d){ handleControllerMessage(d); });
     conn.on('close', function(){
       CTRL.connLost = true; render();
-      setTimeout(function(){ if (role === 'controller' && CTRL.connLost) connectControllerToHost(code); }, 3000);
+      setTimeout(function(){ if (role === 'controller' && CTRL.connLost && !CTRL.error) connectControllerToHost(code); }, 3000);
     });
     render();
   });
@@ -1027,6 +1103,7 @@ function handleControllerMessage(msg){
   if (msg.type === 'welcomeController'){ CTRL.error = null; render(); }
   else if (msg.type === 'controllerState'){ CTRL.state = msg.state; CTRL.connLost = false; render(); }
   else if (msg.type === 'questionBankData'){ CTRL.questionBankCache = msg.questions; render(); }
+  else if (msg.type === 'roomClosed'){ CTRL.error = 'The host closed this room.'; render(); }
 }
 function sendControl(action, arg){
   if (CTRL.conn && CTRL.conn.open) CTRL.conn.send({type:'control', action:action, arg:arg});
@@ -1087,6 +1164,24 @@ Actions.ctrlToggleQuestionBank = function(){
   if (ctrlShowQuestionBank) sendControl('requestQuestionBank');
   render();
 };
+Actions.ctrlCloseRoom = function(){
+  if (!confirm('Close this room and remove everyone? This can\'t be undone.')) return;
+  sendControl('closeRoom');
+};
+Actions.ctrlCopyInviteLink = function(){
+  if (!CTRL.state || !CTRL.state.roomCode) return;
+  var url = buildInviteLink(CTRL.state.roomCode);
+  if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(url).then(function(){
+      ctrlLinkCopied = true; render();
+      setTimeout(function(){ ctrlLinkCopied = false; render(); }, 2000);
+    }).catch(function(){
+      if (typeof prompt !== 'undefined') prompt('Copy this invite link:', url);
+    });
+  } else if (typeof prompt !== 'undefined'){
+    prompt('Copy this invite link:', url);
+  }
+};
 
 /* ============================== VIEWS: LANDING / SETUP ============================== */
 function landingView(){
@@ -1128,7 +1223,7 @@ function playerSetupView(){
       '<label for="playerName">Your name</label>' +
       '<input id="playerName" maxlength="18" placeholder="e.g. Sam" autocomplete="off">' +
       '<label for="roomCodeInput">Room code</label>' +
-      '<input id="roomCodeInput" maxlength="4" placeholder="e.g. QWXK" autocomplete="off" style="text-transform:uppercase;letter-spacing:3px;">' +
+      '<input id="roomCodeInput" maxlength="4" value="'+esc(pendingJoinCode||'')+'" placeholder="e.g. QWXK" autocomplete="off" style="text-transform:uppercase;letter-spacing:3px;">' +
       '<button class="big-btn gold full-btn" data-action="joinRoom">Join room</button>' +
     '</div>' +
   '</div>';
@@ -1213,6 +1308,7 @@ function hostRootView(){
     return '<div class="landing"><p class="tag">Setting up your room\u2026</p></div>';
   }
   if (H.phase === 'lobby') return hostLobbyView();
+  if (H.phase === 'countdown') return hostCountdownView();
   if (H.phase === 'playing') return hostPlayingView();
   if (H.phase === 'voting') return hostVotingView();
   if (H.phase === 'elimination') return hostEliminationView();
@@ -1235,6 +1331,26 @@ function hostLobbyView(){
     '</div>' +
     (H.players.length ? podiumRow(H.players, {}) : '<p class="center-msg">Waiting for players to join\u2026</p>') +
     '<p class="center-msg" style="padding-top:6px;font-size:13px;">The host runs this game from the controller on a second device.</p>' +
+  '</div>';
+}
+function hostCountdownView(){
+  if (H.shootout){
+    var p0 = H.players.filter(function(p){return p.id===H.shootout.order[0];})[0];
+    var p1 = H.players.filter(function(p){return p.id===H.shootout.order[1];})[0];
+    return '<div class="main-compact">' + topBarSimple() +
+      '<div class="duel"><div class="duel-side active"><div class="nm">'+esc(p0.name)+'</div></div><div class="duel-side"><div class="nm">'+esc(p1.name)+'</div></div></div>' +
+      '<div class="countdown-block"><div class="countdown-label">Final shootout starting\u2026</div><div class="js-countdown big-countdown">5</div></div>' +
+    '</div>';
+  }
+  var alive = H.players.filter(function(p){return p.alive;});
+  var askedPlayer = H.players.filter(function(p){return p.id===H.currentAskedId;})[0];
+  return '<div class="main-compact">' + topBarSimple() +
+    podiumRow(alive, {highlightId: H.currentAskedId}) +
+    '<div class="countdown-block">' +
+      '<div class="countdown-label">Round '+H.round+' starting\u2026</div>' +
+      '<div class="js-countdown big-countdown">5</div>' +
+      (askedPlayer ? '<div class="countdown-sub">First up: '+esc(askedPlayer.name)+'</div>' : '') +
+    '</div>' +
   '</div>';
 }
 function hostPlayingView(){
@@ -1316,13 +1432,22 @@ function controllerRootView(){
       (CTRL.connLost ? '<div class="error-box" style="max-width:400px;margin:20px auto 0;">Reconnecting\u2026</div>' : '');
   }
   var s = CTRL.state;
-  if (s.phase === 'lobby') return controllerLobbyView(s);
-  if (s.phase === 'playing') return controllerPlayingView(s);
-  if (s.phase === 'voting') return controllerVotingView(s);
-  if (s.phase === 'elimination') return controllerEliminationView(s);
-  if (s.phase === 'shootout') return controllerShootoutView(s);
-  if (s.phase === 'gameover') return controllerGameOverView(s);
-  return '<div class="center-msg">Unknown phase.</div>';
+  var inner;
+  if (s.phase === 'lobby') inner = controllerLobbyView(s);
+  else if (s.phase === 'countdown') inner = controllerCountdownView(s);
+  else if (s.phase === 'playing') inner = controllerPlayingView(s);
+  else if (s.phase === 'voting') inner = controllerVotingView(s);
+  else if (s.phase === 'elimination') inner = controllerEliminationView(s);
+  else if (s.phase === 'shootout') inner = controllerShootoutView(s);
+  else if (s.phase === 'gameover') inner = controllerGameOverView(s);
+  else inner = '<div class="center-msg">Unknown phase.</div>';
+  return ctrlShell(inner);
+}
+function ctrlShell(inner){
+  return '<div class="ctrl-wrap">' +
+    '<div style="text-align:right;margin-bottom:6px;"><button class="back-link" style="padding:0;font-size:12px;color:var(--muted);" data-action="ctrlCloseRoom">Close room \u2715</button></div>' +
+    inner +
+  '</div>';
 }
 function ctrlTopBar(s){
   return '<div class="top-bar"><div class="room-pill">ROOM '+esc(s.roomCode)+'</div><div class="stat-strip"><span class="stat-chip gold"><b>'+fmtMoney(s.bank)+'</b>Bank</span></div></div>';
@@ -1364,8 +1489,13 @@ function controllerLobbyView(s){
     return '<div class="chip"><span><span class="dot'+(p.connected?'':' off')+'"></span>'+esc(p.name)+'</span>' +
       '<button class="kick-btn" data-action="ctrlKickPlayer" data-arg="'+p.id+'" title="Remove player">\u2715</button></div>';
   }).join('');
-  return '<div class="ctrl-wrap">' +
+  return '' +
     '<div class="top-bar"><div class="room-pill">ROOM '+esc(s.roomCode)+'</div><div class="stat-strip"><span class="stat-chip"><b>'+s.players.length+'</b>Joined</span></div></div>' +
+    '<div class="panel">' +
+      '<h3>Invite players</h3>' +
+      '<p style="font-size:13px;color:var(--muted);margin:0 0 10px;">Share this link \u2014 it opens straight to the join form with the code already filled in.</p>' +
+      '<button class="act-btn primary full-btn" data-action="ctrlCopyInviteLink">'+(ctrlLinkCopied ? 'Link copied \u2713' : 'Copy invite link')+'</button>' +
+    '</div>' +
     '<div class="panel"><h3>Players</h3><div class="roster">'+(rows||'<p class="center-msg" style="padding:10px;">Waiting for players\u2026</p>')+'</div>' +
       '<div class="action-row" style="justify-content:flex-start;margin-top:10px;">' +
         '<input id="addPlayerInput" placeholder="Add a player without a device" style="flex:1;min-width:160px;padding:10px 12px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--text);">' +
@@ -1373,8 +1503,16 @@ function controllerLobbyView(s){
       '</div>' +
     '</div>' +
     controllerQuestionBankPanel(s) +
-    '<button class="big-btn gold full-btn" data-action="ctrlStartGame" '+(s.players.length<3?'disabled':'')+'>Start game ('+s.players.length+' joined'+(s.players.length<3?', need 3+':'')+')</button>' +
-  '</div>';
+    '<button class="big-btn gold full-btn" data-action="ctrlStartGame" '+(s.players.length<3?'disabled':'')+'>Start game ('+s.players.length+' joined'+(s.players.length<3?', need 3+':'')+')</button>';
+}
+function controllerCountdownView(s){
+  var label = s.shootout ? 'Final shootout starting\u2026' : 'Round ' + s.round + ' starting\u2026';
+  return ctrlTopBar(s) +
+    '<div class="panel countdown-block">' +
+      '<div class="countdown-label">'+label+'</div>' +
+      '<div class="js-countdown big-countdown">5</div>' +
+      (s.askedName && !s.shootout ? '<div class="countdown-sub">First up: '+esc(s.askedName)+'</div>' : '') +
+    '</div>';
 }
 function controllerPlayingView(s){
   var stageInner;
@@ -1393,50 +1531,49 @@ function controllerPlayingView(s){
       '<div class="ctrl-asked" style="color:var(--blue);">'+esc(s.askedName||'\u2014')+'</div>' +
       '<div class="action-row"><button class="act-btn primary" data-action="ctrlNextQuestion">Ask next question</button></div>';
   }
-  return '<div class="ctrl-wrap">' +
+  return '' +
     '<div class="top-bar"><div class="room-pill">ROOM '+esc(s.roomCode)+'</div><div class="stat-strip"><span class="stat-chip"><b>'+s.round+'</b>Round</span></div></div>' +
     bigTimerHtml() +
     '<div class="panel">'+stageInner+'</div>' +
     '<div class="panel"><h3>Chain</h3>'+ladderHtml(s.chainIndex)+
       '<div class="bank-total"><div class="amt">'+fmtMoney(s.bank)+'</div><div class="lbl">Team bank</div></div>' +
-      (s.bankCallPending ? '<div class="banner" style="margin-top:10px;">\uD83D\uDD14 '+esc(s.askedName||'')+' wants to bank!</div>' : '') +
-      '<button class="act-btn bank full-btn" data-action="ctrlBankChain" '+(s.chainIndex<0?'disabled':'')+'>Bank '+(s.chainIndex>=0?fmtMoney(s.chainValue):'')+'</button>' +
+      '<button class="act-btn bank full-btn" data-action="ctrlBankChain" '+(s.chainIndex<0?'disabled':'')+'>Bank '+(s.chainIndex>=0?fmtMoney(s.chainValue):'')+' (players can also bank instantly themselves)</button>' +
     '</div>' +
     '<div class="panel"><h3>Players \u2014 tap to choose who\'s asked (with accuracy)</h3>'+controllerRoster(s.players, s.currentAskedId, true)+'</div>' +
-    '<button class="act-btn neutral full-btn" data-action="ctrlEndRound">End round now</button>' +
-  '</div>';
+    (s.log && s.log.length ? '<div class="panel"><h3>Activity</h3><div class="log">'+s.log.map(function(l){return '<div>'+esc(l.msg)+'</div>';}).join('')+'</div></div>' : '') +
+    '<button class="act-btn neutral full-btn" data-action="ctrlEndRound">End round now</button>';
 }
 function controllerVotingView(s){
   var alive = s.players.filter(function(p){return p.alive;});
   if (s.tieCandidates){
     var cands = s.players.filter(function(p){return s.tieCandidates.indexOf(p.id)>=0;});
-    return '<div class="ctrl-wrap">' + ctrlTopBar(s) +
+    return ctrlTopBar(s) +
       '<div class="panel" style="text-align:center;"><h2>It\'s a tie</h2><p class="tag">Performance stats didn\'t break it either. Pick who goes home:</p>' +
-      '<div class="action-row">'+cands.map(function(p){ return '<button class="act-btn incorrect" data-action="ctrlManualTieBreak" data-arg="'+p.id+'">'+esc(p.name)+'</button>'; }).join('')+'</div></div></div>';
+      '<div class="action-row">'+cands.map(function(p){ return '<button class="act-btn incorrect" data-action="ctrlManualTieBreak" data-arg="'+p.id+'">'+esc(p.name)+'</button>'; }).join('')+'</div></div>';
   }
   if (s.revealing && s.revealInfo){
     var isLast = s.revealInfo.index === s.revealOrder.length - 1;
-    return '<div class="ctrl-wrap">' + ctrlTopBar(s) +
+    return ctrlTopBar(s) +
       '<div class="panel" style="text-align:center;">' +
         '<p class="tag">Revealing vote '+(s.revealInfo.index+1)+' of '+s.revealInfo.total+'</p>' +
         '<div class="q-label">'+esc(s.revealInfo.voterName)+' voted for</div>' +
         '<div class="name" style="color:var(--gold);font-family:\'Oswald\',sans-serif;font-size:26px;">'+(s.revealInfo.votedForName?esc(s.revealInfo.votedForName):'No one')+'</div>' +
         '<button class="big-btn gold" style="margin-top:16px;" data-action="ctrlAdvanceReveal">'+(isLast?'Show result':'Reveal next vote')+'</button>' +
-      '</div></div>';
+      '</div>';
   }
-  return '<div class="ctrl-wrap">' + ctrlTopBar(s) +
+  return ctrlTopBar(s) +
     '<div class="panel" style="text-align:center;"><h3>Voting</h3><p class="tag">'+s.votedCount+' of '+alive.length+' voted</p>' +
-    '<button class="big-btn gold" data-action="ctrlStartVoteReveal">Reveal votes</button></div></div>';
+    '<button class="big-btn gold" data-action="ctrlStartVoteReveal">Reveal votes</button></div>';
 }
 function controllerEliminationView(s){
   var e = s.lastElimination;
   var aliveCount = s.players.filter(function(p){return p.alive;}).length;
-  return '<div class="ctrl-wrap">' + ctrlTopBar(s) +
+  return ctrlTopBar(s) +
     '<div class="elim-card"><div class="q-label">Voted off</div><div class="name">'+esc(e.name)+'</div>' +
     (e.note?'<p class="tag">'+esc(e.note)+'</p>':'') +
     '<div class="tally">'+e.tally.map(function(t){ return '<div class="r"><span>'+esc(t.name)+'</span><span>'+t.votes+' vote'+(t.votes===1?'':'s')+'</span></div>'; }).join('')+'</div>' +
     '<button class="big-btn gold" data-action="ctrlContinueAfterElimination">'+(aliveCount===2?'Continue to final shootout':'Continue to next round')+'</button>' +
-  '</div></div>';
+  '</div>';
 }
 function controllerShootoutView(s){
   var sh = s.shootout;
@@ -1455,16 +1592,15 @@ function controllerShootoutView(s){
     stageInner = '<div class="ctrl-asked" style="color:var(--blue);">'+(sh.sudden?'Sudden death':'Up next')+': '+esc(turnName)+'</div>' +
       '<div class="action-row"><button class="act-btn primary" data-action="ctrlShootoutNextQuestion">Ask next question</button></div>';
   }
-  return '<div class="ctrl-wrap">' + ctrlTopBar(s) +
+  return ctrlTopBar(s) +
     '<div class="duel">' +
       '<div class="duel-side'+(sh.currentTurn===0?' active':'')+'"><div class="nm">'+esc(p0.name)+'</div>'+kickBoxes(sh,0)+'</div>' +
       '<div class="duel-side'+(sh.currentTurn===1?' active':'')+'"><div class="nm">'+esc(p1.name)+'</div>'+kickBoxes(sh,1)+'</div>' +
     '</div>' +
-    '<div class="panel">'+stageInner+'</div>' +
-  '</div>';
+    '<div class="panel">'+stageInner+'</div>';
 }
 function controllerGameOverView(s){
-  return '<div class="ctrl-wrap gameover">' +
+  return '<div class="gameover">' +
     '<div class="trophy">\uD83C\uDFC6</div>' +
     '<div class="winner">'+esc(s.winner)+' wins!</div>' +
     '<div class="amt" style="font-family:\'Oswald\',sans-serif;font-size:30px;color:var(--gold);margin-bottom:4px;">'+fmtMoney(s.bank)+'</div>' +
@@ -1493,6 +1629,7 @@ function playerRootView(){
 
   var body;
   if (s.phase === 'lobby') body = playerLobbyView(s, me);
+  else if (s.phase === 'countdown') body = playerCountdownView(s, me);
   else if (s.phase === 'playing') body = playerPlayingView(s, me);
   else if (s.phase === 'voting') body = playerVotingView(s, me);
   else if (s.phase === 'elimination') body = playerEliminationView(s, me);
@@ -1512,6 +1649,14 @@ function playerLobbyView(s, me){
       '<input id="renameInput" maxlength="18" value="'+esc(me.name)+'" style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--text);margin-bottom:10px;">' +
       '<button class="act-btn primary full-btn" data-action="renameMe">Save name</button>' +
     '</div>';
+}
+function playerCountdownView(s, me){
+  var label = s.shootout ? 'Final shootout starting\u2026' : 'Round ' + s.round + ' starting\u2026';
+  return '<div class="panel countdown-block">' +
+      '<div class="countdown-label">'+label+'</div>' +
+      '<div class="js-countdown big-countdown">5</div>' +
+    '</div>' +
+    (me.alive ? '' : '<div class="spectator-tag">You\'ve been voted off \u2014 spectating</div>');
 }
 function playerStatsHtml(me){
   var acc = accuracyOf(me);
@@ -1545,7 +1690,7 @@ function playerPlayingView(s, me){
   if (s.currentQuestion) out += '<div class="panel" style="text-align:center;"><div class="q-label">Question</div><div class="q-text" style="font-size:19px;">'+esc(s.currentQuestion.q)+'</div></div>';
   out += '<div class="panel"><h3>Chain</h3>'+ladderHtml(s.chainIndex)+'<div class="bank-total"><div class="amt">'+fmtMoney(s.bank)+'</div><div class="lbl">Team bank</div></div></div>';
   if (isMyTurn){
-    out += '<button class="full-btn act-btn bank" data-action="callBank">'+(P.bankFlash ? 'Bank request sent \u2713' : 'Call bank! (you can do this any time on your turn)')+'</button>';
+    out += '<button class="full-btn act-btn bank" data-action="callBank" '+(s.chainIndex<0?'disabled':'')+'>'+(P.bankFlash ? 'Banked! \uD83C\uDFE6' : 'Bank the chain now'+(s.chainIndex>=0?' ('+fmtMoney(s.chainValue)+')':''))+'</button>';
   }
   return out;
 }
@@ -1565,7 +1710,9 @@ function playerVotingView(s, me){
     return '<div class="panel" style="text-align:center;"><h3>Vote submitted</h3><p class="tag">Waiting for the rest of the group\u2026</p></div>';
   }
   var options = s.players.filter(function(p){return p.alive && p.id!==s.myId;});
-  var opts = '<option value="">Choose a player\u2026</option>' + options.map(function(p){ return '<option value="'+p.id+'">'+esc(p.name)+'</option>'; }).join('');
+  var opts = '<option value="">Choose a player\u2026</option>' + options.map(function(p){
+    return '<option value="'+p.id+'"'+(P.voteDraft===p.id?' selected':'')+'>'+esc(p.name)+'</option>';
+  }).join('');
   return '<div class="panel" style="text-align:center;"><h3>Who\'s the weakest link?</h3>' +
     '<select id="voteSelect" class="vote-select" style="width:100%;padding:14px;border-radius:10px;background:var(--panel-2);color:var(--text);border:1px solid var(--line);font-size:16px;margin-bottom:12px;">'+opts+'</select>' +
     '<button class="full-btn act-btn incorrect" data-action="submitVote">Submit vote</button></div>';
@@ -1633,7 +1780,9 @@ document.addEventListener('input', function(e){
   if (e.target && e.target.id === 'ctrlCustomQuestions') ctrlQuestionsDraft = e.target.value;
 });
 document.addEventListener('change', function(e){
-  if (!e.target || e.target.id !== 'ctrlCsvFileInput') return;
+  if (!e.target) return;
+  if (e.target.id === 'voteSelect'){ P.voteDraft = e.target.value || null; return; }
+  if (e.target.id !== 'ctrlCsvFileInput') return;
   var file = e.target.files && e.target.files[0];
   if (!file) return;
   var reader = new FileReader();
@@ -1677,12 +1826,19 @@ document.addEventListener('keydown', function(e){
 });
 
 /* Auto-rejoin: if this tab already had a player session (e.g. the page was refreshed),
-   reconnect automatically instead of dropping back to the landing screen. */
-(function autoRejoin(){
+   reconnect automatically instead of dropping back to the landing screen. Otherwise, if the
+   page was opened via a shared invite link (?join=CODE), jump straight to the join form
+   with the room code already filled in. */
+(function init(){
   var sess = getPlayerSession();
   if (sess && sess.roomCode && sess.name){
     connectPlayerToHost(sess.roomCode, sess.name);
     return;
+  }
+  var joinCode = getQueryParam('join');
+  if (joinCode){
+    localView = 'playerSetup';
+    pendingJoinCode = joinCode.toUpperCase().replace(/[^A-Z]/g,'').slice(0,4);
   }
   render();
 })();
