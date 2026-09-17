@@ -1,0 +1,26 @@
+/* admin.html-only tweaks. Everything else (page shell, header, nav, cards,
+   forms, buttons, table, search, pagination, empty/error/success states,
+   tabs, login card) comes from tool-base.css — do not duplicate those rules
+   here. */
+
+/* Inline row-edit state on the question-bank table. */
+.tool-table tr.editing td{background:rgba(79,143,247,0.06);}
+
+/* Visual break between the "add a question" mini-form and the search/table
+   below it, inside the same .tool-card. */
+.admin-add-form{margin-bottom:18px;padding-bottom:18px;border-bottom:1px solid var(--line);}
+
+/* One card per pending submission inside the moderation list card. A gold
+   left-edge accent marks these as "awaiting a decision" at a glance, and
+   the card treatment (vs. the old flat bordered rows) gives each submission
+   clearer visual separation when several are queued up. */
+.admin-submission{background:var(--panel-2);border:1px solid var(--line);border-left:3px solid var(--gold);border-radius:10px;padding:14px 16px;margin-bottom:12px;transition:border-color .15s ease,box-shadow .15s ease;}
+.admin-submission:last-child{margin-bottom:0;}
+.admin-submission:hover{border-color:var(--gold-dim);box-shadow:0 6px 18px -12px rgba(0,0,0,0.5);}
+.admin-submission.editing{border-left-color:var(--blue);}
+
+/* Small free-standing input (e.g. the optional reject reason) that isn't
+   inside a .tool-form, so it needs its own baseline styling. */
+.admin-inline-input{padding:8px 10px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--text);font-size:13px;font-family:inherit;max-width:220px;transition:border-color .15s ease,box-shadow .15s ease;}
+.admin-inline-input:hover{border-color:#3a4568;}
+.admin-inline-input:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(79,143,247,0.18);}

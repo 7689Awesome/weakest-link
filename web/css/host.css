@@ -1,0 +1,190 @@
+/* Host ("big screen") view — spectator-only display. Layout wrapper is wider
+   than the phone-oriented .main-compact from base.css since this renders on
+   a TV/projector; everything else here reuses base.css classes and only adds
+   the handful of host-specific elements and one-shot polish animations. */
+
+.host-wrap{max-width:1100px;margin:0 auto;width:100%;padding:14px 28px 40px;}
+
+/* huge lobby room code */
+.room-code-display{
+  text-align:center;
+  font-family:'Oswald',sans-serif;
+  font-weight:700;
+  font-size:clamp(64px,14vw,140px);
+  color:var(--gold);
+  letter-spacing:0.15em;
+  line-height:1;
+  margin:18px 0 10px;
+}
+
+.host-recovery-note{
+  text-align:center;
+  color:var(--muted);
+  font-size:11px;
+  line-height:1.6;
+  margin:6px 0 4px;
+}
+.host-recovery-url{
+  display:inline-block;
+  margin-top:2px;
+  color:var(--text);
+  font-family:monospace;
+  font-size:11px;
+  user-select:all;
+  background:var(--panel-2);
+  padding:3px 8px;
+  border-radius:6px;
+  word-break:break-all;
+}
+
+/* short status line used above countdowns / voting / etc. */
+.phase-heading{
+  text-align:center;
+  font-family:'Oswald',sans-serif;
+  color:var(--gold);
+  font-size:18px;
+  letter-spacing:0.5px;
+  margin:10px 0 4px;
+}
+
+.elim-note{color:var(--muted);font-size:13px;margin-top:-4px;margin-bottom:10px;}
+
+/* the "Open controller" link reuses .stat-chip but is an <a>, not a <div> */
+a.stat-chip{text-decoration:none;}
+a.stat-chip:hover{border-color:var(--gold-dim);color:var(--gold);}
+
+/* --- one-shot polish animations, triggered from host.js on state deltas --- */
+
+/* The winner screen's bank total keeps the amount/label text but drops the
+   boxed-panel look (background/padding/border-radius) that .bank-total
+   carries everywhere else — just a plain heading here, not another "bar"
+   competing with the winner name above it. Scoped to .host-wrap so it
+   doesn't touch the in-game bank display or the player's own gameover view. */
+.host-wrap .gameover .bank-total{background:none;padding:0;border-radius:0;}
+
+.bank-total.pulse{animation:bankPulse .5s ease;}
+@keyframes bankPulse{
+  0%{transform:scale(1);}
+  30%{transform:scale(1.15);color:#fff;}
+  100%{transform:scale(1);}
+}
+
+.rung-h.just-climbed{animation:rungPop .5s ease;}
+@keyframes rungPop{
+  0%{transform:scale(.7);}
+  60%{transform:scale(1.15);box-shadow:0 0 20px 4px rgba(232,178,61,.5);}
+  100%{transform:scale(1);}
+}
+
+.elim-card .name{animation:elimShake .5s ease;}
+@keyframes elimShake{
+  0%{opacity:0;transform:scale(.5) rotate(-4deg);}
+  60%{opacity:1;transform:scale(1.08) rotate(2deg);}
+  100%{transform:scale(1) rotate(0);}
+}
+
+/* sudden-death pulsing glow around the shootout duel */
+.duel.sudden{border-radius:16px;animation:suddenPulse 1.6s ease-in-out infinite;}
+@keyframes suddenPulse{
+  0%{box-shadow:0 0 0 0 rgba(229,72,77,.55);}
+  70%{box-shadow:0 0 0 22px rgba(229,72,77,0);}
+  100%{box-shadow:0 0 0 0 rgba(229,72,77,0);}
+}
+
+.gameover .trophy{animation:trophyBounce 1.6s ease-in-out infinite;}
+@keyframes trophyBounce{
+  0%,100%{transform:translateY(0);}
+  50%{transform:translateY(-14px);}
+}
+
+/* --- phase-transition color wash --------------------------------------- */
+/* One-shot full-screen flash keyed to entering voting/elimination/gameover,
+   driven by host.js's hostFX.phaseWash flag (cleared 50ms after the render
+   that includes it, same pattern as .just-climbed/.pulse above). */
+.phase-wash{
+  position:fixed;
+  inset:0;
+  pointer-events:none;
+  z-index:40;
+  animation:phaseWashFade .9s ease forwards;
+}
+.phase-wash.voting{background:radial-gradient(circle at 50% 38%, rgba(79,143,247,.32), rgba(79,143,247,0) 70%);}
+.phase-wash.elimination{background:radial-gradient(circle at 50% 38%, rgba(229,72,77,.32), rgba(229,72,77,0) 70%);}
+.phase-wash.gameover{background:radial-gradient(circle at 50% 38%, rgba(232,178,61,.35), rgba(232,178,61,0) 70%);}
+@keyframes phaseWashFade{
+  0%{opacity:0;}
+  18%{opacity:1;}
+  100%{opacity:0;}
+}
+
+/* --- roaming "TV studio" spotlight --------------------------------------- */
+/* Created and repositioned imperatively by host.js (updateRoamingSpotlight),
+   living outside #app so it survives the full-innerHTML-replace render and
+   can transition smoothly between whichever element is currently in focus. */
+.roaming-spotlight{
+  position:fixed;
+  top:0;
+  left:0;
+  width:0;
+  height:0;
+  transform:translate(-50%,-50%);
+  border-radius:50%;
+  background:radial-gradient(circle, rgba(232,178,61,.28) 0%, rgba(232,178,61,.1) 45%, rgba(232,178,61,0) 72%);
+  pointer-events:none;
+  z-index:1;
+  opacity:0;
+  transition:left .6s cubic-bezier(.4,0,.2,1), top .6s cubic-bezier(.4,0,.2,1), width .5s ease, height .5s ease, opacity .4s ease;
+}
+.roaming-spotlight.on{opacity:1;}
+
+/* Static glow behind whichever podium is currently spotlighted — finishes
+   the .spotlight-beam hook components.js's podiumRow already renders (it
+   had no styling before). Distinct from .roaming-spotlight above: this one
+   is per-podium and always-on for the highlighted player, while the roaming
+   spotlight is the single element that travels between focus points. */
+.spotlight-beam{
+  position:absolute;
+  z-index:1;
+  top:-6px;
+  left:50%;
+  width:120px;
+  height:120px;
+  margin-left:-60px;
+  border-radius:50%;
+  background:radial-gradient(circle, rgba(232,178,61,.5) 0%, rgba(232,178,61,.16) 55%, rgba(232,178,61,0) 75%);
+  filter:blur(1px);
+  pointer-events:none;
+  animation:beamGlow 2.4s ease-in-out infinite;
+}
+@keyframes beamGlow{
+  0%,100%{opacity:.7;transform:scale(1);}
+  50%{opacity:1;transform:scale(1.1);}
+}
+
+/* --- waiting-for-players lobby empty state ------------------------------ */
+.lobby-empty{animation:lobbyPulse 2s ease-in-out infinite;}
+@keyframes lobbyPulse{
+  0%,100%{opacity:.6;}
+  50%{opacity:1;}
+}
+
+/* --- countdown urgency (big screen too, not just the controller/phone) -- */
+.big-timer.low{animation:timerUrgentPulse .6s ease-in-out infinite;}
+@keyframes timerUrgentPulse{
+  0%,100%{transform:scale(1);text-shadow:0 0 0 rgba(229,72,77,0);}
+  50%{transform:scale(1.08);text-shadow:0 0 20px rgba(229,72,77,.7);}
+}
+
+/* --- shootout kick impact: quick scale-in/settle instead of appearing statically ---
+   Gated on .kick-impact (added only to the single kick that just changed,
+   for exactly the render it changed on) rather than the bare .hit/.miss
+   state classes — those stay applied permanently once a kick is scored, and
+   since every state broadcast fully rebuilds this row from scratch, an
+   unconditional animation on .hit/.miss would replay on every already-
+   scored kick each time any new kick lands. */
+.kick.kick-impact{animation:kickImpact .3s ease;}
+@keyframes kickImpact{
+  0%{transform:scale(.3);opacity:0;}
+  60%{transform:scale(1.25);opacity:1;}
+  100%{transform:scale(1);}
+}
