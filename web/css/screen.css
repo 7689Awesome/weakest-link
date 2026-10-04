@@ -1,0 +1,64 @@
+/* Big-screen (TV) layout. Everything scales with the viewport. */
+.screen { min-height: 100vh; display: flex; flex-direction: column; padding: clamp(.8rem, 2.4vw, 2.2rem); font-size: clamp(1rem, 1.5vw, 1.6rem); }
+.hud { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
+.hud .brand { font: 900 clamp(1.4rem, 2.6vw, 2.4rem) var(--display); color: var(--gold); }
+.hud .code { font: 800 clamp(1.4rem, 2.6vw, 2.4rem) var(--display); letter-spacing: .3em; color: var(--muted); }
+.hud .bank { min-width: 12ch; text-align: right; color: var(--muted); }
+.hud .bank b { font: 900 clamp(1.6rem, 3vw, 2.8rem) var(--display); color: var(--gold); }
+.screen main { flex: 1; display: flex; flex-direction: column; justify-content: center; }
+.screen .board { --rh: min(8.2vh, 5.6vw); }
+
+.lobby { display: grid; gap: 1.5rem; text-align: center; justify-items: center; }
+.roomcode { font: 900 clamp(7rem, 24vw, 20rem)/.9 var(--display); letter-spacing: .12em; padding-left: .12em; color: var(--gold); text-shadow: 0 0 60px rgba(246, 199, 68, .25); }
+.lobby .chips { justify-content: center; }
+
+.hero { text-align: center; max-width: 60rem; margin: 0 auto; }
+.hero h1.name { font-size: clamp(4rem, 14vw, 11rem); color: var(--gold); }
+.hero h1.money { font-size: clamp(5rem, 20vw, 16rem); color: var(--gold); line-height: .9; }
+.hero .target { font: 800 clamp(2rem, 5vw, 4rem) var(--display); color: var(--red); }
+.hero .pot-line { font: 800 clamp(1.8rem, 4vw, 3.4rem) var(--display); color: var(--gold); }
+.between .chips { justify-content: flex-start; }
+.between { max-width: 70rem; margin: 0 auto; width: 100%; }
+
+.cb-top { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 1rem; }
+.cb-top .pot { text-align: right; }
+.cb-top .pot b { font: 900 clamp(2.4rem, 5vw, 4.4rem) var(--display); color: var(--gold); }
+.cb-top h2 { margin: 0; }
+.cb, .final { max-width: 80rem; margin: 0 auto; width: 100%; }
+.screen .q-text { font-size: clamp(1.8rem, 4.2vw, 3.8rem); text-align: center; margin: 1.2rem 0; }
+
+.buzzed { text-align: center; padding: .7rem 1rem; border-radius: 12px; background: var(--navy); border: 2px solid var(--line); font: 700 clamp(1.2rem, 2.2vw, 2rem) var(--body); color: var(--muted); }
+.buzzed.on { background: var(--gold); color: var(--ink); border-color: var(--gold); }
+.buzzed.stop { background: var(--teal); border-color: var(--teal); }
+
+.h2h { display: grid; grid-template-columns: minmax(0, 36%) minmax(0, 1fr); gap: clamp(1rem, 3vw, 3rem); align-items: center; }
+.panel .q-text { text-align: left; }
+.callout { background: var(--navy); border: 2px solid var(--line); border-radius: var(--radius); padding: 1.5rem; }
+.locks { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: .8rem; }
+.lock { padding: .7rem 1rem; border-radius: 12px; background: var(--navy-2); border: 2px solid var(--line); }
+.lock b { display: block; font: 800 1.6em var(--display); }
+.lock span { color: var(--muted); font-size: .85em; }
+.lock.in { border-color: var(--teal); }
+.lock.in span { color: var(--teal-l); }
+.lock.chaser.in { border-color: var(--red); }
+.lock.chaser.in span { color: #ffb3b8; }
+.window { font: 900 2.6em var(--display); text-align: center; min-width: 1.5ch; color: var(--gold); }
+.window.vs { color: var(--muted); font-size: 1.6em; }
+
+.offers-wrap h2 { text-align: center; }
+.offers { display: grid; grid-template-columns: repeat(3, 1fr); gap: clamp(.6rem, 2vw, 1.6rem); margin-top: 1.5rem; }
+.offer { text-align: center; padding: 1.6rem 1rem; border-radius: var(--radius); background: var(--navy); border: 3px solid var(--line); }
+.offer h3 { margin: 0; color: var(--muted); }
+.offer .amt { font: 900 clamp(2.6rem, 7vw, 6.5rem)/1 var(--display); margin: .2em 0; }
+.offer.higher .amt { color: var(--gold); }
+.offer.lower .amt { color: var(--teal-l); }
+.offer.chosen { border-color: var(--gold); background: var(--navy-2); }
+
+.sound-hint { position: fixed; right: 1rem; bottom: 1rem; z-index: 30; padding: .6rem 1rem; border-radius: 999px; border: 0; background: var(--chalk); color: var(--ink); font: 700 .95rem var(--body); cursor: pointer; opacity: .85; }
+
+@media (max-width: 760px) {
+  .h2h { grid-template-columns: 1fr; }
+  .offers { grid-template-columns: 1fr; }
+  .cb-top { grid-template-columns: 1fr; text-align: center; }
+  .cb-top .pot { text-align: center; }
+}

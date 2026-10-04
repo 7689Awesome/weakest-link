@@ -1,104 +1,84 @@
-# Chain Reaction — project guide
+# Chase Night: project guide
 
-A "Weakest Link"-style trivia elimination party game. Originally a single-file client-only HTML app using PeerJS (WebRTC) for networking; rewritten into a Go backend + buildless ES-module frontend so a real admin/question-bank/moderation system could exist.
+A "The Chase"-style quiz party game. Go backend, buildless ES-module frontend. Structure follows the same ideas as the Weakest Link ("Chain Reaction") project this was based on.
 
 ## Architecture
 
-**The Go server is authoritative for all game state.** Each room is an actor: one goroutine owning a `*room.State` exclusively, driven by a single `select` loop over an inbox channel (client messages, attach/detach events) and a 500ms ticker (countdown→playing transitions, round-timer expiry). Because only that goroutine ever touches the state, none of the ~20 game-action methods (`DoMarkCorrect`, `DoBankChain`, `resolveVotes`, shootout logic, etc.) need any locking — "share memory by communicating," not a mutex.
+**The Go server is authoritative for all game state.** Each room is an actor: one goroutine owns a `*room.State` and handles every event from a single inbox channel plus a 250ms ticker (clock expiry, reveal timing). Only that goroutine touches the state, so the game rules need no locks.
 
-There are three WebSocket roles per room: **player** (a contestant's phone), **controller** (the quizmaster's remote — the only role that can mutate game state), and **host** (the shared big-screen/TV display — read-only, gets the same sanitized no-answer view a player does). Room lifecycle (create/join) goes through REST first; gameplay is entirely over WebSocket once connected. See "WebSocket protocol" below.
+Four client roles, all over WebSocket:
 
-SQLite (`modernc.org/sqlite`, pure Go, no CGO) is used **only** for the question bank, submission moderation queue, and the single admin credential row — never for game state, which is intentionally ephemeral (a server restart loses any live game; redeploy between sessions).
+| Role | Who | Can do |
+|---|---|---|
+| `screen` | The shared TV | Read-only. Same redacted view as a phone. |
+| `host` | The quizmaster's controller | The only role that sees answers and sends `control` actions. |
+| `player` (contestant) | A phone | `lock`, `chooseOffer`, `buzz`, `pickSet` |
+| `player` (chaser) | A phone, flagged by `isChaser` | `lock`, `setOffers`, plus the same view-only roles |
 
-### Go package layout
+The chaser is not a separate connection type; they join like anyone else and the host assigns the role in the lobby. The frontend picks the chaser or contestant UI from `state.me`.
+
+State is in memory only. A restart loses live games; redeploy between sessions.
+
+### Go layout
 
 ```
-cmd/server/main.go       config from env vars, DB open+migrate+seed, wiring, graceful shutdown, -backup flag
+cmd/server/main.go        env config, question bank load, wiring, graceful shutdown
 internal/
-  room/                  pure state machine + the Room actor — zero DB code
-    state.go               State/Player/Question/Shootout structs, NewState, PullQuestion, GenRoomCode
-    actions.go              all Do* game-action methods, ported 1:1 from the original JS do* functions
-                             (chain/banking, voting/tie-break/elimination, shootout, lobby management,
-                             Join/AttachPlayer/DetachPlayer/SubmitVote/CallBank/Rename)
-    room.go                  the Room actor: inbox+ticker select loop, conn registries, broadcast, dispatch
-    sanitize.go               ToPlayerState / ToControllerState DTOs — the ONE place answer-redaction happens
-                             (players/host never receive the current answer text; only the controller does)
-    registry.go                Manager: room-code -> *Room directory (a plain mutex-guarded map, no game
-                             logic runs under its lock)
-    room_test.go                 unit tests covering vote-tie-break and shootout-early-decision logic
-                             directly against State, no networking involved
-  ws/                    transport only, no game rules, no DB — Conn (buffered send queue + read/write/
-                         heartbeat pumps) and the client message envelope/action-name constants
-  questionbank/          SQLite-backed question store + the shared parsing logic (CSV / JSON / "Q | A"
-                         lines), reused by: room custom-bank REST upload, admin bulk import, and public
-                         submissions. seed.go embeds the ~500 original built-in trivia questions, inserted
-                         once on first boot if the questions table is empty.
-  auth/                  single-admin bcrypt + HMAC-signed session cookie (no JWT library, no users table)
-  db/                    sqlite.Open() (WAL mode, busy_timeout, foreign_keys) + migrations/*.sql runner
-  httpapi/                the HTTP layer: router.go/server.go wiring, rooms.go (REST bootstrap), ws.go
-                         (the /ws upgrade handler — the one file that bridges internal/ws and internal/room),
-                         admin_auth.go, admin_questions.go, admin_submissions.go, public_submissions.go
+  bank/                   parses and validates the plain-text question files (embedded by default)
+  room/                   zero network or DB imports: keep it that way
+    state.go                types: Phase, Config, Player, CB/Offers/H2H/Final state, decks
+    actions.go              every rule: Control (host actions), Act (player actions), Tick (clocks)
+    sanitize.go             Snapshot(viewer): the ONE place answers are redacted
+    room.go                 the Room actor and the room-code Manager
+    room_test.go            rules tested directly against State, no networking
+  httpapi/                server.go (REST + static), ws.go (gorilla/websocket adapter), e2e_test.go
 ```
+
+### Game flow (phases)
+
+```
+lobby -> between -> cb_ready -> cb_playing -> cb_done -> offers_set -> offers_choose
+      -> h2h_ready -> h2h_question <-> h2h_reveal -> h2h_over -> (between | final_pick)
+final_pick -> final_team_ready -> final_team -> final_team_done
+           -> final_chaser <-> final_push -> gameover -> (lobby via playAgain)
+```
+
+`h2h_reveal` and the 5-second lock window advance on the ticker; everything else waits for the host or a player action. The board has `BoardSteps`=7 steps; the Chaser starts at position 0, home is position 8. Start positions are 2/3/4 for higher/cash-builder/lower.
 
 ### WebSocket protocol
 
-Room lifecycle is REST, gameplay is WebSocket. There is deliberately **no "join"/"joinController" handshake message** — identity comes entirely from the connection URL, so the server can push the first state message immediately:
+Room lifecycle is REST; gameplay is WebSocket. Identity comes from the connection URL, so there is no join handshake and the server pushes state immediately.
 
-- `POST /api/rooms` `{roundDuration, bank:{mode:"community"|"custom", questions?}}` → `{roomCode, controllerKey}` — `controllerKey` is a separate secret from `roomCode` (see below), returned exactly once here; never rebroadcast.
-- `GET /api/rooms/{code}` → `{exists, phase, playerCount}` (join-screen pre-flight)
-- `POST /api/rooms/{code}/players` `{name, rejoinId?, rejoinToken?}` → `{playerId, playerToken}` (404 room gone, 409 name taken/game in progress)
-- `GET /ws?role=player&code=X&playerId=Y&token=Z` / `?role=controller&code=X&key=K` / `?role=host&code=X`
+- `POST /api/rooms` returns `{roomCode, hostKey}`. `hostKey` is the secret that grants host control; the 4-letter code is public and never enough on its own.
+- `GET /api/rooms/{code}` returns `{exists, phase, playerCount, full}`.
+- `POST /api/rooms/{code}/players` with `{name, rejoinId?, rejoinToken?}` returns `{playerId, playerToken}`.
+- `GET /ws?role=screen&code=X`, `?role=host&code=X&key=K`, `?role=player&code=X&playerId=Y&token=Z`
 
-**`roomCode` vs `controllerKey`**: the 4-letter room code is intentionally public — every player needs it to join — so it must never be sufficient to gain controller access (which sees answers and can mark scores). `controllerKey` (`State.ControllerKey`, a random `NewID()` generated once in `Manager.Create` and preserved across `DoPlayAgain`) is the actual secret; `Room.handleAttach` rejects any `role=controller` WS attach whose `key` doesn't match it (constant-time compare, `internal/room/room.go`). The frontend's "Open quizmaster controller" link (`buildControllerLink`, `core/dom.js`) embeds both `?run=CODE&key=KEY`; the manual `controllerSetupView` fallback asks for both fields explicitly.
+Client to server: `{type:"control"|"act", action, arg}`. Server to client: `{type:"state", state}` (a per-viewer snapshot) or `{type:"error", message}`. A rejected connection is reported in the close frame (codes 4001 replaced, 4003 bad auth, 4004 room gone), which the frontend treats as fatal (no retry).
 
-Client→server messages: `{type:'vote', targetId}`, `{type:'callBank'}`, `{type:'rename', newName}` (players); `{type:'control', action, arg}` (controller — see `internal/ws/protocol.go` for the full 19-action list, e.g. `markCorrect`, `bankChain`, `setQuestionBank`).
+Clocks need no ticking from the server. Snapshots carry absolute `endsAt` epoch-ms timestamps and a `now`; clients correct for skew and count down locally (`web/js/core/clock.js`).
 
-Server→client: `{type:'state', state}` (to each player, sanitized — no answer), `{type:'controllerState', state}` (full state incl. answer + activity log), `{type:'hostState', state}` (same shape as player state), `{type:'questionBankData', questions}`, `{type:'kicked'}`, `{type:'renameFailed', reason}`, `{type:'roomClosed'}`. An attach rejection (bad token, room gone) has no write pump running yet, so it's signaled via the WebSocket **close frame's reason string**, not a JSON message — the frontend's `net.js` surfaces this as `{code, reason}` on the `'close'` event.
-
-Ticking clocks need zero server chatter: the server sends absolute `timer.endsAt`/`countdownEndsAt` epoch-ms timestamps exactly once per real phase change, and every client counts down locally against `Date.now()` (see `main.js`'s `tickLiveTimers`).
-
-### Frontend layout (buildless — plain `<script type="module">`, no bundler)
+### Frontend (buildless)
 
 ```
-web/
-  index.html / admin.html / submit.html     three independent entry points
-  css/  base.css (shared game theme+components) / host.css / controller.css / player.css
-        tool-base.css (shared admin+submit "internal tool" look) / admin.css / submit.css
-  js/
-    core/    dom.js  storage.js  net.js (WebSocket wrapper mirroring the old PeerJS DataConnection
-             interface + REST fetch helpers)  sound.js (Web Audio synthesized SFX, no audio files)
-             questions-parse.js (client-side preview parser — server always re-validates independently)
-    game/    state.js (role/HOST/CTRL/P globals, Actions/Binds/Changes registries, render() pub-sub)
-             components.js (shared render-to-HTML-string helpers)  host.js  controller.js  player.js
-             main.js (landing view, render() dispatcher, global event delegation, live timer ticker, bootstrap)
-    admin/   api.js  admin-app.js   — fully separate mini-app, does not import anything from game/
-    submit/  submit-app.js           — same, fully separate
+web/index.html            single entry; the URL picks the role (see js/game/main.js)
+web/css/                  base, board, screen, host, player
+web/js/core/              dom.js (html`` templates, auto-escaped), net.js, clock.js, sound.js
+web/js/game/              components.js (board, track, options), screen.js, host.js, player.js, main.js
 ```
 
-`web/js/game/main.js` is the render dispatcher: it imports `host.js`/`controller.js`/`player.js`'s view functions and picks one based on `role`/`localView` from `state.js`. Those three role modules never import each other or `main.js` (no cycles) — they only import from `core/` and `game/state.js`+`game/components.js`.
-
-Sound ownership is split deliberately so a room full of devices doesn't all beep in chaotic unison: the **host** (shared screen/speakers) plays the communal gameplay SFX (tick, correct, wrong, bank, eliminate, win); the **player** only plays two personal moments (their own elimination, entering gameover); the **controller** plays nothing (visual `.flash` feedback on keyboard shortcuts instead).
-
-## Running locally
-
-```sh
-ADMIN_BOOTSTRAP_PASSWORD=devpassword go run ./cmd/server
-```
-
-Serves everything (static frontend + REST + WebSocket) on `:8080` from one process — no separate frontend dev server. SQLite auto-creates/migrates/seeds at `./data/weakestlink.db`.
-
-```sh
-go test ./...             # internal/room and internal/questionbank have real coverage
-go vet ./...
-```
-
-## Deploying
-
-See `README.md` for the full $5-VPS Docker Compose + Caddy runbook (domain setup, hardening, backups via the binary's `-backup` flag using `VACUUM INTO`).
+Views are functions from a snapshot to an `html` string; `main.js` re-renders only when the string changes. Buttons are wired by delegation: `data-send="control|act" data-action data-arg`.
 
 ## Conventions worth preserving
 
-- Keep the frontend buildless. The only external asset dependency is Google Fonts; no bundler, no framework, no npm.
-- Keep `internal/room` free of network/DB imports — it's the one package that's fully unit-testable in isolation, and that's load-bearing for confidence in the trickiest logic (tie-breaking, shootout math).
-- Never send the current question's answer to a player or the host — only the controller. This redaction lives entirely in `internal/room/sanitize.go`; don't bypass it by hand-building a different payload elsewhere.
-- Rooms are intentionally not persisted. Don't add game-state persistence without discussing it first — it changes the redeploy story described in the README.
+- Keep the frontend buildless. The only external asset is Google Fonts.
+- Keep `internal/room` free of network and database imports. It is what makes the rules unit-testable.
+- Never send an answer to the screen or a phone before it is revealed. Redaction lives only in `sanitize.go`; a test in `room_test.go` and the e2e test both check it.
+- Rooms are intentionally not persisted.
+
+## Ideas not built yet
+
+- Admin-curated question bank in SQLite with public submissions (the Weakest Link project has this).
+- A solo "nominated player" final chase when everyone is caught.
+- Chaser-side "super offer", and negative lower offers once money is in the bank.
+- Host-uploaded custom question sets per room.

@@ -1,76 +1,33 @@
-// Small framework-free helpers shared by every view module.
+// Tiny templating: html`...` escapes every interpolated value unless it is
+// itself the result of html`...` (or an array of them).
 
-export function $(sel, root) {
-  return (root || document).querySelector(sel);
+class Raw {
+  constructor(s) { this.s = s; }
+  toString() { return this.s; }
 }
 
-export function esc(s) {
-  return String(s == null ? '' : s).replace(/[&<>"']/g, (c) => (
-    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
-  ));
+const ESC = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+export const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ESC[c]);
+
+function part(v) {
+  if (v instanceof Raw) return v.s;
+  if (Array.isArray(v)) return v.map(part).join('');
+  if (v === null || v === undefined || v === false) return '';
+  return esc(v);
 }
 
-export function fmtMoney(n) {
-  return '$' + Number(n || 0).toLocaleString();
+export function html(strings, ...vals) {
+  let out = strings[0];
+  vals.forEach((v, i) => { out += part(v) + strings[i + 1]; });
+  return new Raw(out);
 }
 
-export function fmtClock(ms) {
-  const s = Math.max(0, Math.ceil(ms / 1000));
-  const m = Math.floor(s / 60);
-  const r = s % 60;
-  return m + ':' + (r < 10 ? '0' : '') + r;
-}
+export const raw = (s) => new Raw(s);
 
-export function accuracyOf(p) {
-  const total = (p.correct || 0) + (p.incorrect || 0);
-  if (total === 0) return null;
-  return Math.round((p.correct / total) * 100);
-}
+export const CURRENCY = '£';
+export const money = (n) => (n < 0 ? '-' : '') + CURRENCY + Math.abs(n).toLocaleString('en-GB');
 
-export function uid() {
-  return Math.random().toString(36).slice(2, 9);
-}
+export const $ = (sel, root = document) => root.querySelector(sel);
 
-export function getQueryParam(name) {
-  try {
-    return new URLSearchParams(window.location.search).get(name);
-  } catch (e) {
-    return null;
-  }
-}
-
-export function buildInviteLink(code) {
-  try {
-    return window.location.origin + window.location.pathname.replace(/[^/]*$/, '') + '?join=' + code;
-  } catch (e) {
-    return '?join=' + code;
-  }
-}
-
-// Same idea as buildInviteLink, but opens straight into the quizmaster
-// controller (auto-connected, no setup form) — used by the host's lobby
-// screen so the same person can run both the big screen and the controller.
-// `key` is the room's separate controller secret (never the same as the
-// public room code) — without it, anyone who can join the game could also
-// open the controller and see answers / mark scores.
-export function buildControllerLink(code, key) {
-  try {
-    const base = window.location.origin + window.location.pathname.replace(/[^/]*$/, '');
-    return `${base}?run=${code}&key=${encodeURIComponent(key)}`;
-  } catch (e) {
-    return `?run=${code}&key=${encodeURIComponent(key)}`;
-  }
-}
-
-// Reopens the big-screen display for an already-running room — no secret
-// needed (the host view is read-only and shows nothing a player can't
-// already see). Lets the host recover if the display tab/window gets closed
-// or crashes, without losing the game — the room itself lives on the server
-// independently of any one browser tab.
-export function buildHostLink(code) {
-  try {
-    return window.location.origin + window.location.pathname.replace(/[^/]*$/, '') + '?host=' + code;
-  } catch (e) {
-    return '?host=' + code;
-  }
-}
+// JSON for a data-arg attribute. html`` escapes it, so don't escape twice.
+export const jarg = (o) => JSON.stringify(o);

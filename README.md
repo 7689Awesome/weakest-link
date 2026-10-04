@@ -1,156 +1,126 @@
-# Chain Reaction
+# Chase Night
 
-A "Weakest Link"-style trivia elimination party game. A Go server holds the game state and drives a shared big-screen display, a quizmaster's controller, and each contestant's phone over WebSockets; a small REST API handles room creation, an admin-curated question bank, and public question submissions.
+A "The Chase"-style quiz party game. One person is the Chaser, up to four are contestants, and a quizmaster runs the show. A Go server holds the game and drives three kinds of screen over WebSockets: a shared big screen (TV), the quizmaster's controller, and everyone's phone.
 
-## How a game works
+## How a game plays
 
-- **Guests need no account.** One person creates a room (picks it up on the big screen — a TV, a laptop plugged into one), gets a 4-letter room code, and shares it (or a `?join=CODE` link). Contestants join from their phones with just a name.
-- **The quizmaster runs the game from a separate device** (the "controller") — marking answers correct/incorrect, advancing rounds, managing eliminations and the final 1-on-1 shootout.
-- **The question bank** defaults to a shared, admin-curated community set, or a host can paste/upload a one-off set for just that game.
-- **Anyone can suggest questions** for the community bank at `/submit.html`; an admin reviews and approves/rejects them at `/admin.html`.
+1. **Lobby.** The quizmaster creates a room and gets a 4-letter code. Open the big screen on the TV, and everyone else joins from their phone with the code and a name. The quizmaster picks the Chaser; everyone else is a contestant.
+2. **For each contestant, in turn:**
+   - **Cash builder.** 60 seconds. The quizmaster reads questions and marks them right or wrong. Each correct answer is worth £1,000.
+   - **Offers.** The Chaser sets a *higher* offer (start one step closer to the Chaser) and a *lower* offer (one step further away). The contestant picks one, or sticks with their cash-builder total.
+   - **Head-to-head.** Contestant and Chaser answer the same three-choice questions on their phones. The first to lock in starts a 5-second countdown for the other. Each correct answer moves that person one step down a 7-step board. The Chaser starts at the top; the contestant starts on step 2 (higher offer, 6 correct to get home), step 3 (cash builder, 5 correct) or step 4 (lower offer, 4 correct). Reach home and the money goes in the team bank. If the Chaser lands on you, you're caught.
+3. **Final chase** (players who got home).
+   - Finalists vote for question set A or B. The majority's set is the team's; the Chaser gets the other.
+   - **Team round:** 2 minutes. Buzz in on your phone; the first buzz locks everyone else out; the quizmaster rules right or wrong. No steals. Every correct answer is a step, plus a one-step head start per finalist.
+   - **Chaser round:** 2 minutes to answer as many as the team scored. If the Chaser gets one wrong the clock stops and the team can buzz in and answer the same question. A correct team answer pushes the Chaser back a step.
+   - Catch the team and the Chaser wins; run out the clock and the team splits the bank.
+
+### Assumptions to know about
+
+These are choices made where the brief was open. Each is a small change in `internal/room/actions.go`.
+
+- Only players who made it home vote, buzz and share the prize. Caught players are out of the final chase.
+- A tie in the set vote is settled at random.
+- Head start in the final chase is one step per finalist (as on the TV show). Set `Head` to `0` in `startFinal` to remove it.
+- The final chase has no solo "nominated player" rescue round: if everyone is caught, the Chaser wins.
+- The lower offer can be £0 but never negative.
+
+## URLs
+
+| URL | Who it's for |
+|---|---|
+| `/host` | The quizmaster. Bookmark it: **Start a new game**, or **Resume** a room this device was running. |
+| `/screen` | The TV. Asks for the room code. |
+| `/` | Everyone else: join with the code and a name. `/?join=ABCD` pre-fills the code. |
+
+Players are normally sent `/?join=CODE` (the controller has a **Copy join link** button). The controller link itself contains a secret key, so only share it with a second quizmaster device.
+
+There is no admin login in this version; the questions are text files (see Questions below).
 
 ## Local development
 
-Requires Go 1.23+ (see `go.mod`). No Node/build step for the frontend — it's plain ES modules served as static files.
+Requires Go 1.22+. There is no Node or build step; the frontend is plain ES modules served as static files.
 
 ```sh
 go run ./cmd/server
 ```
 
-This serves everything on `http://localhost:8080` (the static frontend from `web/`, the REST API, and the WebSocket endpoint), using a SQLite file at `./data/weakestlink.db` (auto-created, auto-migrated, auto-seeded with the built-in trivia set on first boot) and an ephemeral in-memory session-signing key (fine for local dev — set `SESSION_SIGNING_KEY` explicitly if you want admin sessions to survive a restart).
+Open <http://localhost:8080>.
 
-On first run, set an admin bootstrap password:
+To test a full game on your own, open these in separate browser windows (use private windows for the players so their seats don't collide):
+
+1. **Quizmaster:** `/` then **Create a room**.
+2. **Big screen:** `/?screen=CODE` (or **Open big screen** in the controller).
+3. **Chaser and contestants:** `/` then **Join a game**, one window each.
+
+To try it on real phones, find your computer's local IP (`ipconfig` on Windows, `ip addr` on Linux, `ifconfig` on macOS), then browse to `http://<that-ip>:8080` from the phones on the same Wi-Fi.
+
+Add `FAST_MODE=true` to shorten every clock (6s cash builder, 8s final chase) for quick testing:
 
 ```sh
-ADMIN_BOOTSTRAP_PASSWORD=devpassword go run ./cmd/server
+FAST_MODE=true go run ./cmd/server
 ```
-
-Then log in at `http://localhost:8080/admin.html` with that password.
 
 ### Environment variables
 
 | Variable | Default | Purpose |
 |---|---|---|
 | `PORT` | `8080` | HTTP listen port |
-| `DB_PATH` | `./data/weakestlink.db` | SQLite file location |
-| `STATIC_DIR` | `./web` | Where the frontend static files are served from |
-| `ADMIN_BOOTSTRAP_PASSWORD` | — | Sets the initial admin password on first boot only; ignored afterward |
-| `SESSION_SIGNING_KEY` | ephemeral | Base64 string (`openssl rand -base64 32`) signing the admin session cookie |
-| `SECURE_COOKIES` | `true` | Set to `false` for local HTTP dev so the login cookie isn't rejected by the browser |
+| `STATIC_DIR` | `./web` | Where the frontend is served from |
+| `QUESTIONS_DIR` | built-in | Folder containing your own question files (see below) |
+| `FAST_MODE` | off | `true` shortens all clocks, for testing only |
 
-### Running the tests
+### Questions
 
-```sh
-go test ./...
-```
+Question banks are plain text, one per line, in `internal/bank/data/`:
 
-The room package (`internal/room`) has the heaviest coverage — the ported chain/vote/tie-break/shootout mechanics are unit-tested in isolation from any networking.
+| File | Format |
+|---|---|
+| `cashbuilder.txt` | `Question \| Answer` |
+| `final_a.txt`, `final_b.txt` | `Question \| Answer` |
+| `headtohead.txt` | `Question \| Correct \| Wrong \| Wrong` |
 
-### Rotating the admin password
+Lines starting with `#` are comments. The head-to-head options are shuffled every time, so always write the correct one first. The server refuses to start if a bank is too small (20 cash builder, 20 head-to-head, 30 per final set). To use your own files without rebuilding, point `QUESTIONS_DIR` at a folder with the same four filenames.
 
-There's a `POST /api/admin/password` endpoint (`{"newPassword": "..."}`, requires an authenticated session) for rotating off the bootstrap password:
-
-```sh
-curl -X POST http://localhost:8080/api/admin/password \
-  -H 'Content-Type: application/json' \
-  -b cookies.txt \
-  -d '{"newPassword":"something-longer-and-private"}'
-```
-
-(Log in first with `-c cookies.txt` against `/api/admin/login` to get the session cookie into that file.)
-
-## Deploying to a $5 VPS
-
-This targets the smallest tier at any provider (DigitalOcean/Hetzner/Vultr — 1 vCPU / 1GB RAM is plenty), using Docker Compose: the Go binary + a Caddy reverse proxy that handles HTTPS automatically. SQLite lives on a Docker volume; game rooms are in-memory only (never persisted) — a redeploy loses any live game, so redeploy between sessions, not mid-game.
-
-### 1. Point a domain at the server
-
-Buy/use a domain, create an `A` (and `AAAA` if you have IPv6) record pointing at the VPS's public IP, and wait for it to resolve:
+### Tests
 
 ```sh
-dig +short chain.example.com
+go test -race ./...
 ```
 
-This must resolve **before** Caddy's first start — it requests a Let's Encrypt certificate via an HTTP-01 challenge on port 80, which needs the domain to already point here.
+`internal/room` holds the game rules as a pure state machine and has the most coverage (steps to home for each offer, the 5-second lock window, the final chase pushback, and that answers never reach the screen or phones early). `internal/httpapi` has an end-to-end test over real WebSockets.
 
-### 2. Provision and harden the VPS
+## Deploying to a small VPS
 
-Ubuntu 24.04 LTS, smallest instance size (1 vCPU / 1GB RAM).
+Docker Compose runs the Go binary behind Caddy, which gets an HTTPS certificate automatically. Rooms live in memory only, so redeploy between games, not during one.
 
-```sh
-adduser deploy && usermod -aG sudo deploy
-# copy your SSH public key to /home/deploy/.ssh/authorized_keys, then:
-# in /etc/ssh/sshd_config: PermitRootLogin no, PasswordAuthentication no
-systemctl restart sshd
+1. Point an `A` record for your domain at the server's IP and wait for it to resolve (`dig +short chase.example.com`). This must work before Caddy starts.
+2. Install Docker on the server, then:
+   ```sh
+   git clone <your-repo-url> /opt/chase && cd /opt/chase
+   cp .env.example .env     # set DOMAIN
+   docker compose up -d --build
+   ```
+3. Visit `https://your-domain`.
 
-ufw allow 22 && ufw allow 80 && ufw allow 443 && ufw enable
-apt install -y unattended-upgrades fail2ban
+### Running alongside Weakest Link
 
-# a swap file is cheap insurance on a 1GB box
-fallocate -l 1G /swapfile && chmod 600 /swapfile
-mkswap /swapfile && swapon /swapfile
-echo '/swapfile none swap sw 0 0' >> /etc/fstab
-```
+Easiest is a subdomain, such as `chase.gamenights.lol`, because the game uses root-relative paths (`/css`, `/ws`, `/api`) and doesn't work under a sub-path like `/chase/`.
 
-### 3. Install Docker
+1. Add an `A` record for `chase.gamenights.lol` pointing at the same server.
+2. Put both apps on one Docker network and add a second block to the **existing** Caddyfile, pointing at this app's container name and port (the name below is an example; use whatever your compose file calls it):
+   ```
+   chase.gamenights.lol {
+   	encode gzip
+   	reverse_proxy chase-app:8080
+   }
+   ```
+3. Run this project's `app` service without its own `caddy` service (two Caddy instances can't both bind ports 80 and 443). Delete the `caddy` service and the `DOMAIN` line from this `docker-compose.yml`, and attach `app` to the network the existing Caddy uses.
 
-```sh
-curl -fsSL https://get.docker.com | sh
-usermod -aG docker deploy
-```
+Then the quizmaster bookmarks `https://chase.gamenights.lol/host`.
 
-### 4. Clone and configure
-
-```sh
-git clone <this-repo-url> /opt/weakest-link
-cd /opt/weakest-link
-cp .env.example .env
-# edit .env: set DOMAIN, ADMIN_BOOTSTRAP_PASSWORD, and a fresh SESSION_SIGNING_KEY
-openssl rand -base64 32   # paste the output as SESSION_SIGNING_KEY
-```
-
-### 5. Start it
-
-```sh
-docker compose up -d --build
-```
-
-Caddy obtains its certificate on the first incoming HTTPS request. Visit `https://chain.example.com`, confirm it loads over a valid cert, then visit `/admin.html` and log in with your bootstrap password.
-
-### Redeploying after changes
-
-```sh
-git pull
-docker compose up -d --build
-```
-
-This rebuilds and recreates only the `app` container in place — Caddy is untouched (no cert re-issuance, no downtime for it). Because rooms are in-memory, do this between game sessions, not mid-game.
-
-### Logs & health
-
-```sh
-docker compose logs -f app
-docker compose logs -f caddy
-docker compose ps
-```
-
-### Backups
-
-SQLite is the only durable state (questions, submissions, admin credentials). The binary has a built-in `-backup` flag using SQLite's `VACUUM INTO` (safe to run live, under WAL mode):
-
-```sh
-docker compose exec -T app ./server -backup /app/data/backups/backup-$(date +%F).db
-```
-
-Add to the host's crontab (not inside the container):
-
-```
-0 3 * * * cd /opt/weakest-link && docker compose exec -T app ./server -backup /app/data/backups/backup-$(date +\%F).db
-0 4 * * * find /opt/weakest-link/data/backups -mtime +14 -delete
-```
-
-Periodically copy the latest backup off the VPS (`scp`/`rsync` to your laptop, or a cheap object-storage bucket) — a VPS-local backup alone doesn't protect against losing the VPS itself. Actually test a restore occasionally rather than assuming the file is good.
+To update: `git pull && docker compose up -d --build`. Logs: `docker compose logs -f app`.
 
 ## Project layout
 
-See `CLAUDE.md` for the architecture overview (Go backend package layout, frontend module structure, WebSocket protocol) aimed at anyone (human or AI) picking up this codebase next.
+See `CLAUDE.md` for the architecture and the WebSocket protocol.

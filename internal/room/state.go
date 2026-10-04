@@ -1,241 +1,237 @@
-// Package room implements the Chain Reaction game engine: a pure, in-memory
-// state machine with no network or storage dependencies, so it can be unit
-// tested in isolation and driven by any transport (see internal/ws).
+// Package room holds the Chase game rules as a pure state machine (State) and
+// the actor that drives it over the network (Room). This file defines the
+// state; actions.go mutates it; sanitize.go turns it into per-viewer JSON.
+//
+// Nothing in this package imports networking or a database. Keep it that way:
+// it is what makes the rules unit-testable.
 package room
 
 import (
 	"crypto/rand"
 	"encoding/hex"
-	"math/big"
+	mrand "math/rand"
+	"time"
+
+	"chase/internal/bank"
 )
 
-// ChainValues is the money ladder a player climbs one correct answer at a time.
-var ChainValues = []int{20, 50, 100, 150, 200, 300, 400, 500, 600, 700, 800, 900, 1000}
-
+// Phase is the stage of the game. The host drives most transitions; a few are
+// timed (see State.Tick).
 type Phase string
 
 const (
-	PhaseLobby       Phase = "lobby"
-	PhaseCountdown   Phase = "countdown"
-	PhasePlaying     Phase = "playing"
-	PhaseVoting      Phase = "voting"
-	PhaseElimination Phase = "elimination"
-	PhaseShootout    Phase = "shootout"
-	PhaseGameOver    Phase = "gameover"
+	PhaseLobby Phase = "lobby" // players joining, host assigning the chaser
+
+	PhaseBetween Phase = "between" // choosing who plays next
+
+	PhaseCBReady   Phase = "cb_ready"   // cash builder: waiting for host to start the clock
+	PhaseCBPlaying Phase = "cb_playing" // cash builder: 60s clock running
+	PhaseCBDone    Phase = "cb_done"    // cash builder: clock ended, total shown
+
+	PhaseOffersSet    Phase = "offers_set"    // chaser is setting higher/lower offers
+	PhaseOffersChoose Phase = "offers_choose" // player is picking an offer
+
+	PhaseH2HReady    Phase = "h2h_ready"    // board set, waiting for host to start
+	PhaseH2HQuestion Phase = "h2h_question" // both locking in an answer
+	PhaseH2HReveal   Phase = "h2h_reveal"   // answers revealed, board moves
+	PhaseH2HOver     Phase = "h2h_over"     // player is home or caught
+
+	PhaseFinalPick      Phase = "final_pick"       // finalists vote for set A or B
+	PhaseFinalTeamReady Phase = "final_team_ready" // waiting to start the team's 2 minutes
+	PhaseFinalTeam      Phase = "final_team"       // team clock running, buzzers live
+	PhaseFinalTeamDone  Phase = "final_team_done"  // team's clock ended, score shown
+	PhaseFinalChaser    Phase = "final_chaser"     // chaser clock running
+	PhaseFinalPush      Phase = "final_push"       // chaser missed: clock stopped, team may push back
+	PhaseGameOver       Phase = "gameover"
 )
 
-type CountdownTarget string
+// PStatus is where a player stands in the game.
+type PStatus string
 
 const (
-	TargetNone     CountdownTarget = ""
-	TargetRound    CountdownTarget = "round"
-	TargetShootout CountdownTarget = "shootout"
+	StatusWaiting PStatus = "waiting"
+	StatusHome    PStatus = "home"   // made it home in the head-to-head
+	StatusCaught  PStatus = "caught" // caught by the chaser
 )
 
-// Question is a trivia question/answer pair.
-type Question struct {
-	Q string `json:"q"`
-	A string `json:"a"`
+// Config holds the tunable rules. DefaultConfig matches the TV show.
+type Config struct {
+	CashPerCorrect int           // money per correct cash-builder answer
+	CBSeconds      int           // cash builder clock
+	FinalSeconds   int           // final chase clock (team and chaser each get one)
+	LockWindow     time.Duration // once one side locks in, the other has this long
+	RevealFor      time.Duration // how long a head-to-head reveal stays up before the next question
+	BoardSteps     int           // steps on the board; home is BoardSteps+1
+	StartLower     int           // starting step for the lower offer (further from the chaser)
+	StartMiddle    int           // starting step when playing for the cash-builder total
+	StartHigher    int           // starting step for the higher offer (closer to the chaser)
+	MaxContestants int           // players besides the chaser
 }
 
-// Player mirrors the JS player object shape, plus a server-side-only Token
-// (never serialized/broadcast) used to authenticate WS reconnects.
+func DefaultConfig() Config {
+	return Config{
+		CashPerCorrect: 1000,
+		CBSeconds:      60,
+		FinalSeconds:   120,
+		LockWindow:     5 * time.Second,
+		RevealFor:      4 * time.Second,
+		BoardSteps:     7,
+		StartLower:     4,
+		StartMiddle:    3,
+		StartHigher:    2,
+		MaxContestants: 4,
+	}
+}
+
+// Home returns the position that counts as reaching the bank.
+func (c Config) Home() int { return c.BoardSteps + 1 }
+
+// Player is one person in the room. Exactly one player is the chaser.
 type Player struct {
-	ID        string `json:"id"`
-	Name      string `json:"name"`
-	Alive     bool   `json:"alive"`
-	Correct   int    `json:"correct"`
-	Incorrect int    `json:"incorrect"`
-	Connected bool   `json:"connected"`
-	Token     string `json:"-"`
+	ID        string
+	Name      string
+	Token     string
+	Status    PStatus
+	CashBuilt int    // total from their cash builder
+	Banked    int    // money they brought home (0 if caught)
+	Vote      string // "A" or "B" in the final-set vote
+	Connected bool   // maintained by the Room actor
 }
 
-type Timer struct {
-	Duration int   `json:"duration"` // seconds
-	EndsAt   int64 `json:"endsAt"`   // epoch ms
-	Running  bool  `json:"running"`
+type CBState struct {
+	Correct int
+	Asked   int
+	EndsAt  time.Time
+	Q       *bank.QA
 }
 
-type EliminationTally struct {
-	Name  string `json:"name"`
-	Votes int    `json:"votes"`
+type OffersState struct {
+	Lower, Middle, Higher int
+	SuggestLower          int
+	SuggestHigher         int
+	Choice                string // "lower" | "middle" | "higher" once chosen
 }
 
-type Elimination struct {
-	Name  string             `json:"name"`
-	Tally []EliminationTally `json:"tally"`
-	Note  string             `json:"note"`
+// Amount returns the money riding on the chosen offer.
+func (o OffersState) Amount() int {
+	switch o.Choice {
+	case "lower":
+		return o.Lower
+	case "higher":
+		return o.Higher
+	default:
+		return o.Middle
+	}
 }
 
-// ShootoutRound records both players' results for one wave of the shootout.
-// A nil pointer means "not yet answered", matching the JS `null`.
-type ShootoutRound struct {
-	P0 *string `json:"p0"`
-	P1 *string `json:"p1"`
+const (
+	pickNone  = -1 // hasn't locked in yet
+	pickTimed = -2 // ran out of time after the other side locked in
+)
+
+type H2HState struct {
+	Start       int
+	PlayerPos   int
+	ChaserPos   int
+	QNum        int
+	Q           *bank.MC // options already shuffled; Q.Answer indexes the correct one
+	PlayerPick  int
+	ChaserPick  int
+	Deadline    time.Time // when the slower side is locked out (zero until someone locks in)
+	RevealUntil time.Time
+	PlayerRight bool
+	ChaserRight bool
+	Outcome     string // "", "home", "caught"
 }
 
-type Shootout struct {
-	Order             [2]string       `json:"order"`
-	Rounds            []ShootoutRound `json:"rounds"`
-	CurrentRoundIndex int             `json:"currentRoundIndex"`
-	CurrentTurn       int             `json:"currentTurn"` // 0 or 1, index into Order
-	CurrentQuestion   *Question       `json:"currentQuestion"`
-	Sudden            bool            `json:"sudden"`
-	WinnerID          string          `json:"winnerId"`
+type FinalState struct {
+	Finalists     []string
+	TeamSet       string // "A" or "B"
+	ChaserSet     string
+	Head          int // head start: one step per finalist
+	TeamCorrect   int
+	ChaserCorrect int
+	Pushbacks     int
+	Q             *bank.QA
+	QNum          int
+	BuzzedBy      string
+	Running       bool
+	EndsAt        time.Time
+	Remaining     time.Duration // frozen time while the clock is stopped
 }
 
-type LogEntry struct {
-	T   int64  `json:"t"`
-	Msg string `json:"msg"`
+// Target is how many correct answers the chaser must reach to catch the team.
+func (f *FinalState) Target() int { return f.Head + f.TeamCorrect + f.Pushbacks }
+
+type Result struct {
+	Winner    string   `json:"winner"` // "team" or "chaser"
+	Bank      int      `json:"bank"`
+	PerPlayer int      `json:"perPlayer"`
+	Finalists []string `json:"finalists"`
 }
 
-// State is the full authoritative game state for one room — the Go
-// equivalent of the JS `H` object. Only the owning Room actor goroutine
-// (see room.go) may ever touch a State value; that is what makes every
-// method on it safe to call without locks.
+// State is the whole game. Only one goroutine (the Room actor) touches it.
 type State struct {
-	Phase         Phase
-	RoomCode      string
-	RoundDuration int // seconds, fixed at room creation
+	cfg     Config
+	rng     *mrand.Rand
+	Code    string
+	HostKey string
+	Phase   Phase
 
-	// ControllerKey is a separate secret from RoomCode, required to attach as
-	// the quizmaster controller. RoomCode alone is intentionally public (every
-	// player needs it to join), so without a second secret anyone who can join
-	// the game could also open the controller and see answers / mark scores.
-	// Never sent in any broadcast state — only returned once, directly from
-	// POST /api/rooms.
-	ControllerKey string
+	Players   []*Player
+	ChaserID  string
+	Queue     []string // contestants still to play, in order
+	CurrentID string
 
-	Players []*Player
+	CB     CBState
+	Offers OffersState
+	H2H    H2HState
+	Final  FinalState
+	Result *Result
+	Log    []string
 
-	ChainIndex int // -1 means no live chain
-	Bank       int
-	Round      int
-
-	CurrentAskedID  string
-	CurrentQuestion *Question
-
-	Timer Timer
-
-	Votes map[string]string // voterID -> targetID
-
-	LastElimination *Elimination
-	TieCandidates   []string
-	TieTally        map[string]int
-
-	Revealing   bool
-	RevealOrder []string
-	RevealIndex int
-
-	CountdownEndsAt int64
-	CountdownTarget CountdownTarget
-
-	Shootout *Shootout
-	Winner   string
-
-	Log []LogEntry
-
-	QuestionBank []Question
-	UsingCustom  bool
-	deck         []Question // shuffled draw pile, refilled from QuestionBank
-
-	// communityBank is the snapshot fetched from the DB when the room was
-	// created; DoResetQuestionBank() reverts to it after a custom upload.
-	communityBank []Question
+	cbDeck    *deck[bank.QA]
+	h2hDeck   *deck[bank.MC]
+	finalDeck map[string]*deck[bank.QA]
 }
 
-// NewState builds a fresh lobby-phase state, mirroring newHostState().
-// communityBank is the room's default bank (the server's shared/community
-// question bank at creation time); if usingCustom is true, bank is the
-// one-off custom set supplied at room creation instead. controllerKey must be
-// generated once at room creation (see Manager.Create) and preserved across
-// DoPlayAgain — it is NOT regenerated here, since NewState is also called on
-// every play-again reset and rotating it would silently lock out an already
-// -connected quizmaster's saved link.
-func NewState(roomCode, controllerKey string, roundDuration int, communityBank []Question, bank []Question, usingCustom bool) *State {
+// NewState builds a fresh lobby using the given question bank.
+func NewState(code, hostKey string, set *bank.Set, cfg Config, rng *mrand.Rand) *State {
 	return &State{
-		Phase:         PhaseLobby,
-		RoomCode:      roomCode,
-		ControllerKey: controllerKey,
-		RoundDuration: roundDuration,
-		Players:       []*Player{},
-		ChainIndex:    -1,
-		Round:         1,
-		Timer:         Timer{Duration: roundDuration},
-		Votes:         map[string]string{},
-		QuestionBank:  bank,
-		UsingCustom:   usingCustom,
-		communityBank: communityBank,
+		cfg:     cfg,
+		rng:     rng,
+		Code:    code,
+		HostKey: hostKey,
+		Phase:   PhaseLobby,
+		cbDeck:  newDeck(set.CashBuilder, rng),
+		h2hDeck: newDeck(set.HeadToHead, rng),
+		finalDeck: map[string]*deck[bank.QA]{
+			"A": newDeck(set.FinalA, rng),
+			"B": newDeck(set.FinalB, rng),
+		},
 	}
 }
 
-const maxLogEntries = 8
+// --- helpers ---------------------------------------------------------------
 
-// PushLog prepends a log entry, matching pushLog()'s newest-first, capped-at-8 behavior.
-func (s *State) PushLog(now int64, msg string) {
-	s.Log = append([]LogEntry{{T: now, Msg: msg}}, s.Log...)
-	if len(s.Log) > maxLogEntries {
-		s.Log = s.Log[:maxLogEntries]
-	}
+// NewID returns a random hex id/token.
+func NewID() string {
+	b := make([]byte, 12)
+	_, _ = rand.Read(b)
+	return hex.EncodeToString(b)
 }
 
-// emptyBankQuestion is returned defensively if a room's question bank is
-// empty (e.g. every question was deleted mid-game) so callers never index
-// into an empty deck instead of crashing.
-var emptyBankQuestion = Question{Q: "No questions available — ask the admin to add some.", A: "—"}
-
-// PullQuestion draws from a shuffled deck, refilling/reshuffling from the
-// active question bank whenever it's exhausted — an unbiased
-// draw-without-replacement-until-exhausted, matching pullQuestion().
-func (s *State) PullQuestion() Question {
-	if len(s.deck) == 0 {
-		if len(s.QuestionBank) == 0 {
-			return emptyBankQuestion
-		}
-		s.deck = shuffledCopy(s.QuestionBank)
+// GenRoomCode returns a 4-letter room code.
+func GenRoomCode() string {
+	const letters = "ABCDEFGHJKLMNPQRSTUVWXYZ" // no I or O: too easy to misread
+	b := make([]byte, 4)
+	for i := range b {
+		b[i] = letters[mrand.Intn(len(letters))]
 	}
-	last := len(s.deck) - 1
-	q := s.deck[last]
-	s.deck = s.deck[:last]
-	return q
+	return string(b)
 }
 
-func shuffledCopy(qs []Question) []Question {
-	out := make([]Question, len(qs))
-	copy(out, qs)
-	for i := len(out) - 1; i > 0; i-- {
-		j := randIntn(i + 1)
-		out[i], out[j] = out[j], out[i]
-	}
-	return out
-}
-
-// randIntn returns a uniform random int in [0, n) using crypto/rand, so the
-// room package has no dependency on math/rand seeding behavior.
-func randIntn(n int) int {
-	if n <= 0 {
-		return 0
-	}
-	v, err := rand.Int(rand.Reader, big.NewInt(int64(n)))
-	if err != nil {
-		return 0
-	}
-	return int(v.Int64())
-}
-
-// AlivePlayers returns players with Alive==true, in roster order.
-func (s *State) AlivePlayers() []*Player {
-	out := make([]*Player, 0, len(s.Players))
-	for _, p := range s.Players {
-		if p.Alive {
-			out = append(out, p)
-		}
-	}
-	return out
-}
-
-// FindPlayer returns the player with the given id, or nil.
-func (s *State) FindPlayer(id string) *Player {
+func (s *State) player(id string) *Player {
 	for _, p := range s.Players {
 		if p.ID == id {
 			return p
@@ -244,20 +240,63 @@ func (s *State) FindPlayer(id string) *Player {
 	return nil
 }
 
-const roomCodeAlphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ" // no O/I, matching genRoomCode()
+func (s *State) chaser() *Player  { return s.player(s.ChaserID) }
+func (s *State) current() *Player { return s.player(s.CurrentID) }
 
-// GenRoomCode returns a random 4-letter room code from an unambiguous alphabet.
-func GenRoomCode() string {
-	b := make([]byte, 4)
-	for i := range b {
-		b[i] = roomCodeAlphabet[randIntn(len(roomCodeAlphabet))]
+func (s *State) logf(msg string) {
+	s.Log = append(s.Log, msg)
+	if len(s.Log) > 60 {
+		s.Log = s.Log[len(s.Log)-60:]
 	}
-	return string(b)
 }
 
-// NewID returns a random opaque identifier, used for player IDs and reconnect tokens.
-func NewID() string {
-	b := make([]byte, 12)
-	_, _ = rand.Read(b)
-	return hex.EncodeToString(b)
+// bankTotal is the money brought home so far.
+func (s *State) bankTotal() int {
+	t := 0
+	for _, p := range s.Players {
+		if p.Status == StatusHome {
+			t += p.Banked
+		}
+	}
+	return t
+}
+
+// deck deals items in a shuffled order and reshuffles when exhausted.
+type deck[T any] struct {
+	items []T
+	order []int
+	pos   int
+	rng   *mrand.Rand
+}
+
+func newDeck[T any](items []T, rng *mrand.Rand) *deck[T] {
+	d := &deck[T]{items: items, rng: rng}
+	d.reshuffle()
+	return d
+}
+
+func (d *deck[T]) reshuffle() {
+	d.order = d.rng.Perm(len(d.items))
+	d.pos = 0
+}
+
+func (d *deck[T]) next() T {
+	if d.pos >= len(d.order) {
+		d.reshuffle()
+	}
+	v := d.items[d.order[d.pos]]
+	d.pos++
+	return v
+}
+
+// shuffleMC randomises option order and tracks where the correct one lands.
+func shuffleMC(q bank.MC, rng *mrand.Rand) bank.MC {
+	out := bank.MC{Q: q.Q}
+	for i, p := range rng.Perm(3) {
+		out.Options[i] = q.Options[p]
+		if p == q.Answer {
+			out.Answer = i
+		}
+	}
+	return out
 }

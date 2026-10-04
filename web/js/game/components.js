@@ -1,131 +1,120 @@
-// Shared render-to-HTML-string components used across host/controller/player
-// views — the same "build markup once, patch the odd node directly for
-// high-frequency updates" approach the original single-file app used.
+// Render helpers shared by the screen, host and phone views.
+import { html, raw, money } from '../core/dom.js';
 
-import { esc, fmtMoney, accuracyOf } from '../core/dom.js';
-import { CHAIN_VALUES } from './state.js';
+export const LETTERS = ['A', 'B', 'C'];
 
-export function ladderHtml(chainIndex, justClimbed) {
-  return '<div class="ladder-h">' + CHAIN_VALUES.map((v, i) => {
-    let cls = 'rung-h';
-    if (i === chainIndex) cls += ' current';
-    else if (i < chainIndex) cls += ' climbed';
-    if (i === chainIndex && justClimbed) cls += ' just-climbed';
-    return `<div class="${cls}">${fmtMoney(v)}</div>`;
-  }).join('') + '</div>';
-}
+export const nameOf = (s, id) => s.players.find((p) => p.id === id)?.name ?? '';
+export const chaserOf = (s) => s.players.find((p) => p.isChaser);
+export const currentOf = (s) => s.players.find((p) => p.id === s.currentId);
+export const contestants = (s) => s.players.filter((p) => !p.isChaser);
 
-// .js-timer / .js-countdown text is patched directly by a lightweight
-// interval in main.js (see startLiveTicker), never via a full re-render —
-// the server only sends absolute endsAt/countdownEndsAt timestamps, exactly
-// once per real phase change, so the ticking display costs zero network traffic.
-export function bigTimerHtml() {
-  return '<div class="big-timer js-timer">--:--</div>';
-}
+export const stepsToHome = (s, choice) => {
+  const start = { lower: s.cfg.startLower, middle: s.cfg.startMiddle, higher: s.cfg.startHigher }[choice];
+  return s.cfg.home - start;
+};
 
-export function countdownHtml(sub) {
-  return `<div class="countdown-block">
-    <div class="countdown-label">Starting in</div>
-    <div class="big-countdown js-countdown">5</div>
-    ${sub ? `<div class="countdown-sub">${esc(sub)}</div>` : ''}
-  </div>`;
-}
-
-export function podiumRow(players, spotlightId, dimmed) {
-  const cls = 'podium-row' + (dimmed ? ' dimmed' : '');
-  return `<div class="${cls}">` + players.map((p) => {
-    const spot = p.id === spotlightId;
-    const acc = accuracyOf(p);
-    return `<div class="podium${spot ? ' spotlight' : ''}" data-player-id="${p.id}">
-      ${spot ? '<div class="spotlight-beam"></div>' : ''}
-      <div class="podium-name">${esc(p.name)}${p.alive ? '' : ' 💀'}</div>
-      <div class="podium-acc">${acc == null ? '—' : acc + '%'}</div>
-      <div class="podium-base"></div>
-    </div>`;
-  }).join('') + '</div>';
-}
-
-export function standingsHtml(players) {
-  const sorted = [...players].sort((a, b) => (b.correct - b.incorrect) - (a.correct - a.incorrect));
-  return '<div class="standings">' + sorted.map((p) => {
-    const acc = accuracyOf(p);
-    return `<div class="r"><span>${esc(p.name)}</span><span>${acc == null ? 'no answers yet' : acc + '% accuracy'}</span></div>`;
-  }).join('') + '</div>';
-}
-
-export const allPlayersAccuracyTable = standingsHtml;
-
-export function controllerRoster(players, currentAskedId) {
-  return '<div class="roster">' + players.filter((p) => p.alive).map((p) => `
-    <div class="chip${p.id === currentAskedId ? ' selected' : ''}" data-action="ctrlSelectAsked" data-arg="${p.id}">
-      <span><span class="dot${p.connected ? '' : ' off'}"></span>${esc(p.name)}</span>
-      <span class="sub">${p.correct}&#10003; ${p.incorrect}&#10007;</span>
-    </div>
-  `).join('') + '</div>';
-}
-
-export function kickBoxes(players, canKick) {
-  return '<div class="roster">' + players.map((p) => `
-    <div class="chip">
-      <span><span class="dot${p.connected ? '' : ' off'}"></span>${esc(p.name)}</span>
-      ${canKick ? `<button class="kick-btn" data-action="ctrlKickPlayer" data-arg="${p.id}">&#10005;</button>` : ''}
-    </div>
-  `).join('') + '</div>';
-}
-
-export function tallyHtml(tally) {
-  if (!tally || !tally.length) return '';
-  return '<div class="tally">' + tally.map((t) => `<div class="r"><span>${esc(t.name)}</span><span>${t.votes} vote${t.votes === 1 ? '' : 's'}</span></div>`).join('') + '</div>';
-}
-
-export function activityLog(entries) {
-  if (!entries || !entries.length) return '';
-  return '<div class="log">' + entries.map((e) => `<div>${esc(e.msg)}</div>`).join('') + '</div>';
-}
-
-// Shared paste/CSV question-bank editor, used by the host room-setup screen
-// and the controller's in-lobby bank panel. `idPrefix` keeps element ids
-// unique when (in principle) more than one instance could render.
-export function questionBankEditorHtml(idPrefix, draftText, preview) {
-  return `
-    <div class="qbank-editor">
-      <textarea id="${idPrefix}CustomQuestions" data-bind="${idPrefix}QuestionsDraft" placeholder="Question | Answer&#10;One per line, or paste a JSON array of [q, a] pairs">${esc(draftText || '')}</textarea>
-      <div class="file-row">
-        <input type="file" id="${idPrefix}CsvFileInput" accept=".csv,text/csv" data-bind="${idPrefix}Csv">
-        <span>or upload a .csv file</span>
-      </div>
-      ${preview ? `
-        <div class="qbank-preview">
-          Found <b>${preview.questions.length}</b> question${preview.questions.length === 1 ? '' : 's'} in <b>${esc(preview.fileName)}</b>.
-          <div class="btns">
-            <button class="act-btn primary" data-action="${idPrefix}UseCsvQuestions">Use these questions</button>
-            <button class="act-btn neutral" data-action="${idPrefix}ClearCsvPreview">Cancel</button>
-          </div>
-        </div>
-      ` : ''}
-    </div>
-  `;
-}
-
-export function spawnConfetti(container, count) {
-  const layer = document.createElement('div');
-  layer.className = 'confetti-layer';
-  const colors = ['var(--gold)', 'var(--red)', 'var(--green)', 'var(--blue)', '#ffffff'];
-  for (let i = 0; i < count; i++) {
-    const piece = document.createElement('div');
-    piece.className = 'confetti-piece';
-    piece.style.setProperty('--x', Math.random() * 100 + '%');
-    piece.style.setProperty('--size', (6 + Math.random() * 6) + 'px');
-    piece.style.setProperty('--c', colors[i % colors.length]);
-    piece.style.setProperty('--dur', (2.5 + Math.random() * 2).toFixed(2) + 's');
-    piece.style.setProperty('--delay', (Math.random() * 1.2).toFixed(2) + 's');
-    if (Math.random() > 0.5) piece.style.borderRadius = '50%';
-    layer.appendChild(piece);
+// The funnel board from the show: red chaser pad on top, seven steps, home at
+// the bottom. Rows between the chaser and the player are lit teal.
+export function boardHTML(s) {
+  const { cfg, h2h, offers } = s;
+  const chaser = chaserOf(s);
+  const cur = currentOf(s);
+  const rows = [];
+  for (let i = 0; i <= cfg.home; i += 1) {
+    const hasC = i === h2h.chaserPos;
+    const hasP = i === h2h.playerPos;
+    let cls = 'row';
+    if (i === 0) cls += ' pad';
+    if (i === cfg.home) cls += ' homerow';
+    if (hasC && hasP) cls += ' caught';
+    else if (hasC) cls += ' has-chaser';
+    else if (hasP) cls += ' has-player';
+    else if (i > h2h.chaserPos && i < h2h.playerPos) cls += ' gap';
+    else if (i < h2h.chaserPos) cls += ' past';
+    else cls += ' ahead';
+    rows.push(html`
+      <div class="${cls}" style="--i:${i}">
+        ${hasC ? html`<span class="who c"><b>${chaser?.name}</b></span>` : ''}
+        ${hasP ? html`<span class="who p"><i class="arr l"></i><span class="amt">${money(offers?.amount ?? 0)}</span><small>${cur?.name}</small><i class="arr r"></i></span>` : ''}
+        ${i === 0 && !hasC ? html`<svg class="chev" viewBox="0 0 100 40" aria-hidden="true"><path d="M4 4 L50 36 L96 4" /></svg>` : ''}
+        ${i === cfg.home && !hasP ? html`<span class="homelabel">Home</span>` : ''}
+      </div>`);
   }
-  container.appendChild(layer);
-  setTimeout(() => layer.remove(), 6000);
+  return html`<div class="board" role="img" aria-label="Chase board">${rows}</div>`;
 }
 
-export function soundToggleHtml(muted) {
-  return `<button class="sound-toggle${muted ? '' : ' on'}" data-action="toggleSound" title="${muted ? 'Unmute' : 'Mute'} sound effects">${muted ? '&#128263;' : '&#128266;'}</button>`;
+// Final chase: a segmented bar. The chaser eats segments from the left; the
+// colour of each remaining segment says where the team's lead came from.
+export function trackHTML(f) {
+  const segs = [];
+  for (let i = 0; i < f.target; i += 1) {
+    let kind;
+    if (i < f.chaserCorrect) kind = 'chased';
+    else if (i < f.head) kind = 'head';
+    else if (i < f.head + f.teamCorrect) kind = 'team';
+    else kind = 'push';
+    segs.push(html`<i class="seg ${kind}"></i>`);
+  }
+  return html`
+    <div class="track-wrap">
+      <div class="track" role="img" aria-label="Chaser has ${f.chaserCorrect} of ${f.target} steps">${segs}</div>
+      <div class="track-key">
+        <span><i class="seg head"></i>Head start ${f.head}</span>
+        <span><i class="seg team"></i>Team ${f.teamCorrect}</span>
+        <span><i class="seg push"></i>Pushed back ${f.pushbacks}</span>
+        <span><i class="seg chased"></i>Chaser ${f.chaserCorrect}</span>
+      </div>
+    </div>`;
 }
+
+export function optionsHTML(s, { buttons = false, mine = null, locked = false } = {}) {
+  const h = s.h2h;
+  const revealed = !!h.reveal;
+  const player = currentOf(s);
+  const chaser = chaserOf(s);
+  return html`
+    <div class="opts ${buttons ? 'as-buttons' : ''}">
+      ${h.options.map((text, i) => {
+        let cls = 'opt';
+        if (h.correct === i) cls += ' correct'; // server only sends this to the host, or after the reveal
+        if (revealed && h.correct !== i && (h.reveal.playerPick === i || h.reveal.chaserPick === i)) cls += ' wrong';
+        if (mine === i) cls += ' mine';
+        const tags = revealed ? html`
+          ${h.reveal.playerPick === i ? html`<em class="tag p">${player?.name}</em>` : ''}
+          ${h.reveal.chaserPick === i ? html`<em class="tag c">${chaser?.name}</em>` : ''}` : '';
+        const inner = html`<span class="ltr">${LETTERS[i]}</span><span class="txt">${text}</span>${tags}`;
+        return buttons
+          ? html`<button class="${cls}" data-send="act" data-action="lock" data-arg='${JSON.stringify({ choice: i })}' ${locked ? 'disabled' : ''}>${inner}</button>`
+          : html`<div class="${cls}">${inner}</div>`;
+      })}
+    </div>`;
+}
+
+export function rosterChips(s) {
+  return html`<ul class="chips">
+    ${s.players.map((p) => html`
+      <li class="chip ${p.isChaser ? 'is-chaser' : ''} ${p.connected ? '' : 'away'} ${p.status}">
+        <b>${p.name}</b>
+        ${p.isChaser ? html`<small>Chaser</small>` : ''}
+        ${p.status === 'home' ? html`<small>Home ${money(p.banked)}</small>` : ''}
+        ${p.status === 'caught' ? html`<small>Caught</small>` : ''}
+        ${p.status === 'waiting' && p.cashBuilt > 0 ? html`<small>${money(p.cashBuilt)}</small>` : ''}
+      </li>`)}
+  </ul>`;
+}
+
+export const clockEl = (endsAt, { fmt = 'clock', cls = '' } = {}) =>
+  html`<span class="clock ${cls}" data-ends="${endsAt}" data-fmt="${fmt}">–</span>`;
+
+export const frozenEl = (ms) => html`<span class="clock frozen" data-frozen="${ms}">–</span>`;
+
+export function resultHTML(s) {
+  const r = s.result;
+  if (!r) return '';
+  const names = r.finalists.map((id) => nameOf(s, id)).join(', ');
+  return r.winner === 'team'
+    ? html`<div class="result team"><h2>The team beat the Chaser</h2><p class="prize">${money(r.perPlayer)} each</p><p>${money(r.bank)} shared between ${names}</p></div>`
+    : html`<div class="result chaser"><h2>The Chaser wins</h2><p>${r.finalists.length ? 'The team was caught in the final chase.' : 'Nobody made it home.'}</p></div>`;
+}
+
+export { raw };

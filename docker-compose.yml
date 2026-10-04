@@ -3,35 +3,26 @@ services:
     build: .
     restart: unless-stopped
     environment:
-      - PORT=8080
-      - DB_PATH=/app/data/weakestlink.db
-      - ADMIN_BOOTSTRAP_PASSWORD=${ADMIN_BOOTSTRAP_PASSWORD}
-      - SESSION_SIGNING_KEY=${SESSION_SIGNING_KEY}
-      - SECURE_COOKIES=true
-    volumes:
-      - dbdata:/app/data
-    networks: [internal]
-    # No published host port on purpose — only Caddy is internet-facing.
+      - FAST_MODE=${FAST_MODE:-}
+      - QUESTIONS_DIR=${QUESTIONS_DIR:-}
+    expose:
+      - "8080"
 
   caddy:
-    image: caddy:2-alpine
+    image: caddy:2
     restart: unless-stopped
     ports:
       - "80:80"
       - "443:443"
     environment:
-      - DOMAIN=${DOMAIN}
+      - DOMAIN=${DOMAIN:?set DOMAIN in .env}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
-    depends_on: [app]
-    networks: [internal]
-
-networks:
-  internal: {}
+    depends_on:
+      - app
 
 volumes:
-  dbdata: {}
-  caddy_data: {}
-  caddy_config: {}
+  caddy_data:
+  caddy_config:

@@ -1,0 +1,62 @@
+# Head-to-head — three-choice questions. Format: Question | Correct | Wrong | Wrong
+# The room shuffles the options every time, so the correct answer always goes first here.
+Which is the largest ocean on Earth? | Pacific | Atlantic | Indian
+Who painted the ceiling of the Sistine Chapel? | Michelangelo | Raphael | Donatello
+What is the chemical symbol for silver? | Ag | Si | Sv
+Which country has the most natural lakes? | Canada | Russia | Finland
+In which city would you find the Eiffel Tower? | Paris | Lyon | Brussels
+Which planet in our solar system has the shortest day? | Jupiter | Mars | Mercury
+Who wrote Pride and Prejudice? | Jane Austen | Charlotte Bronte | Emily Bronte
+What is the smallest country in the world by area? | Vatican City | Monaco | San Marino
+Which element has the chemical symbol Fe? | Iron | Fluorine | Lead
+In which Shakespeare play does the character Iago appear? | Othello | Macbeth | Hamlet
+What is the capital of New Zealand? | Wellington | Auckland | Christchurch
+In which year did the Second World War end? | 1945 | 1944 | 1946
+What is the longest river in Africa? | The Nile | The Congo | The Niger
+Who discovered penicillin? | Alexander Fleming | Louis Pasteur | Joseph Lister
+Which sport uses the terms birdie and eagle? | Golf | Cricket | Baseball
+What is the largest bone in the human body? | Femur | Tibia | Humerus
+What is the fastest land animal? | Cheetah | Pronghorn | Lion
+What is the capital of Brazil? | Brasilia | Rio de Janeiro | Sao Paulo
+Who composed The Magic Flute? | Mozart | Beethoven | Haydn
+How many hearts does an octopus have? | Three | Two | Four
+Which gas makes up most of Earth's atmosphere? | Nitrogen | Oxygen | Carbon dioxide
+In which country would you find Machu Picchu? | Peru | Bolivia | Ecuador
+Which mineral is hardest on the Mohs scale? | Diamond | Quartz | Topaz
+Who was British Prime Minister for most of the Second World War? | Winston Churchill | Neville Chamberlain | Clement Attlee
+What is the currency of Switzerland? | Swiss franc | Euro | Krona
+Which planet is known for its Great Red Spot? | Jupiter | Mars | Saturn
+What is the main ingredient of guacamole? | Avocado | Tomato | Cucumber
+Who painted Girl with a Pearl Earring? | Johannes Vermeer | Rembrandt | Frans Hals
+Which city hosted the 2016 Summer Olympics? | Rio de Janeiro | London | Beijing
+What is the capital of Thailand? | Bangkok | Hanoi | Jakarta
+Roughly how fast does light travel? | 300,000 km per second | 30,000 km per second | 3,000,000 km per second
+Which author created Sherlock Holmes? | Arthur Conan Doyle | Agatha Christie | Charles Dickens
+How many strings does a violin have? | Four | Five | Six
+In which country did pizza originate? | Italy | Greece | Spain
+Which blood type is known as the universal donor? | O negative | AB positive | A negative
+What is the tallest animal in the world? | Giraffe | Elephant | Ostrich
+Which language has the most native speakers? | Mandarin Chinese | English | Spanish
+Who was the first woman to fly solo across the Atlantic? | Amelia Earhart | Bessie Coleman | Amy Johnson
+In which city is the Parthenon? | Athens | Rome | Istanbul
+Which is the largest island in the world that is not a continent? | Greenland | New Guinea | Borneo
+Which organ is primarily affected by hepatitis? | Liver | Kidney | Lung
+How many keys does a standard piano have? | 88 | 76 | 92
+Which scientist formulated the laws of motion and universal gravitation? | Isaac Newton | Galileo Galilei | Johannes Kepler
+What is the capital of South Korea? | Seoul | Busan | Pyongyang
+Which ship sank on its maiden voyage in 1912? | Titanic | Lusitania | Britannic
+In which country did judo originate? | Japan | China | Korea
+What does DNA stand for? | Deoxyribonucleic acid | Dioxyribonucleic acid | Deoxyribonitric acid
+Who wrote The Great Gatsby? | F. Scott Fitzgerald | Ernest Hemingway | John Steinbeck
+Which mountain range contains Mount Everest? | The Himalayas | The Andes | The Alps
+In which US state is the Grand Canyon? | Arizona | Nevada | Utah
+What is the chemical formula for table salt? | NaCl | KCl | CaCl2
+Which country won the first FIFA World Cup in 1930? | Uruguay | Brazil | Argentina
+Which planet is the hottest in the solar system? | Venus | Mercury | Mars
+In which year did the Berlin Wall fall? | 1989 | 1991 | 1987
+What is the capital of Kenya? | Nairobi | Mombasa | Kampala
+Who wrote A Brief History of Time? | Stephen Hawking | Carl Sagan | Richard Feynman
+What is a group of lions called? | A pride | A pack | A herd
+Which painter is famous for cutting off part of his own ear? | Vincent van Gogh | Pablo Picasso | Claude Monet
+Which Roman emperor is said to have fiddled while Rome burned? | Nero | Caligula | Augustus
+What is the largest organ of the human body? | The skin | The liver | The lungs

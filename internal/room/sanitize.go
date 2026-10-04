@@ -1,227 +1,272 @@
 package room
 
-// This file builds the per-audience DTOs broadcast to clients, mirroring
-// sanitizeForPlayer/sanitizeForController from the original JS: players and
-// the host's big screen must NEVER receive the current answer; only the
-// controller (quizmaster) does.
+import "time"
 
-type PlayerPublic struct {
+// Viewer identifies who a snapshot is for. This file is the ONE place answer
+// redaction happens: only the host ever receives answers before they are
+// revealed. Do not hand-build a different payload elsewhere.
+type Viewer struct {
+	Role     string // "screen" | "host" | "player"
+	PlayerID string // set for role "player"
+}
+
+type PlayerView struct {
+	ID        string  `json:"id"`
+	Name      string  `json:"name"`
+	IsChaser  bool    `json:"isChaser"`
+	Connected bool    `json:"connected"`
+	Status    PStatus `json:"status"`
+	CashBuilt int     `json:"cashBuilt"`
+	Banked    int     `json:"banked"`
+	Queued    bool    `json:"queued"` // still to play
+}
+
+type MeView struct {
 	ID        string `json:"id"`
 	Name      string `json:"name"`
-	Alive     bool   `json:"alive"`
-	Correct   int    `json:"correct"`
-	Incorrect int    `json:"incorrect"`
-	Connected bool   `json:"connected"`
+	IsChaser  bool   `json:"isChaser"`
+	IsCurrent bool   `json:"isCurrent"` // in the hot seat right now
+	Finalist  bool   `json:"finalist"`
+	Vote      string `json:"vote,omitempty"`
 }
 
-func toPlayerPublic(players []*Player) []PlayerPublic {
-	out := make([]PlayerPublic, len(players))
-	for i, p := range players {
-		out[i] = PlayerPublic{ID: p.ID, Name: p.Name, Alive: p.Alive, Correct: p.Correct, Incorrect: p.Incorrect, Connected: p.Connected}
+type CfgView struct {
+	BoardSteps  int `json:"boardSteps"`
+	Home        int `json:"home"`
+	CBSeconds   int `json:"cbSeconds"`
+	FinalSecs   int `json:"finalSeconds"`
+	StartLower  int `json:"startLower"`
+	StartMiddle int `json:"startMiddle"`
+	StartHigher int `json:"startHigher"`
+	CashPerQ    int `json:"cashPerCorrect"`
+}
+
+type CBView struct {
+	Correct  int    `json:"correct"`
+	Total    int    `json:"total"`
+	Asked    int    `json:"asked"`
+	EndsAt   int64  `json:"endsAt,omitempty"`
+	Question string `json:"question,omitempty"`
+	Answer   string `json:"answer,omitempty"` // host only
+}
+
+type OffersView struct {
+	Lower         int    `json:"lower"`
+	Middle        int    `json:"middle"`
+	Higher        int    `json:"higher"`
+	SuggestLower  int    `json:"suggestLower"`
+	SuggestHigher int    `json:"suggestHigher"`
+	Choice        string `json:"choice,omitempty"`
+	Amount        int    `json:"amount"`
+	Set           bool   `json:"set"` // offers have been made
+}
+
+type H2HView struct {
+	Start        int      `json:"start"`
+	PlayerPos    int      `json:"playerPos"`
+	ChaserPos    int      `json:"chaserPos"`
+	QNum         int      `json:"qNum"`
+	Question     string   `json:"question,omitempty"`
+	Options      []string `json:"options,omitempty"`
+	Correct      *int     `json:"correct,omitempty"` // host always; everyone after the reveal
+	PlayerLocked bool     `json:"playerLocked"`
+	ChaserLocked bool     `json:"chaserLocked"`
+	DeadlineAt   int64    `json:"deadlineAt,omitempty"`
+	MyPick       *int     `json:"myPick,omitempty"`
+	Reveal       *RevealV `json:"reveal,omitempty"`
+	Outcome      string   `json:"outcome,omitempty"`
+}
+
+type RevealV struct {
+	PlayerPick  int  `json:"playerPick"` // -2 = locked out
+	ChaserPick  int  `json:"chaserPick"`
+	PlayerRight bool `json:"playerRight"`
+	ChaserRight bool `json:"chaserRight"`
+}
+
+type FinalView struct {
+	Finalists     []string          `json:"finalists"`
+	Voted         []string          `json:"voted"`
+	Votes         map[string]string `json:"votes,omitempty"` // host only
+	TeamSet       string            `json:"teamSet,omitempty"`
+	ChaserSet     string            `json:"chaserSet,omitempty"`
+	Head          int               `json:"head"`
+	TeamCorrect   int               `json:"teamCorrect"`
+	ChaserCorrect int               `json:"chaserCorrect"`
+	Pushbacks     int               `json:"pushbacks"`
+	Target        int               `json:"target"`
+	Question      string            `json:"question,omitempty"`
+	Answer        string            `json:"answer,omitempty"` // host only
+	QNum          int               `json:"qNum"`
+	BuzzedBy      string            `json:"buzzedBy,omitempty"`
+	Running       bool              `json:"running"`
+	EndsAt        int64             `json:"endsAt,omitempty"`
+	RemainingMs   int64             `json:"remainingMs,omitempty"`
+}
+
+type View struct {
+	Code      string       `json:"code"`
+	Phase     Phase        `json:"phase"`
+	Now       int64        `json:"now"`
+	Cfg       CfgView      `json:"cfg"`
+	Players   []PlayerView `json:"players"`
+	ChaserID  string       `json:"chaserId"`
+	CurrentID string       `json:"currentId"`
+	Bank      int          `json:"bank"`
+	Me        *MeView      `json:"me,omitempty"`
+	CB        *CBView      `json:"cb,omitempty"`
+	Offers    *OffersView  `json:"offers,omitempty"`
+	H2H       *H2HView     `json:"h2h,omitempty"`
+	Final     *FinalView   `json:"final,omitempty"`
+	Result    *Result      `json:"result,omitempty"`
+	Log       []string     `json:"log,omitempty"` // host only
+}
+
+func ms(t time.Time) int64 {
+	if t.IsZero() {
+		return 0
+	}
+	return t.UnixMilli()
+}
+
+// Snapshot builds the JSON-ready view of the game for one viewer.
+func (s *State) Snapshot(v Viewer, now time.Time) View {
+	host := v.Role == "host"
+	out := View{
+		Code: s.Code, Phase: s.Phase, Now: now.UnixMilli(),
+		ChaserID: s.ChaserID, CurrentID: s.CurrentID, Bank: s.bankTotal(), Result: s.Result,
+		Cfg: CfgView{
+			BoardSteps: s.cfg.BoardSteps, Home: s.cfg.Home(),
+			CBSeconds: s.cfg.CBSeconds, FinalSecs: s.cfg.FinalSeconds,
+			StartLower: s.cfg.StartLower, StartMiddle: s.cfg.StartMiddle, StartHigher: s.cfg.StartHigher,
+			CashPerQ: s.cfg.CashPerCorrect,
+		},
+	}
+
+	queued := map[string]bool{}
+	for _, id := range s.Queue {
+		queued[id] = true
+	}
+	for _, p := range s.Players {
+		out.Players = append(out.Players, PlayerView{
+			ID: p.ID, Name: p.Name, IsChaser: p.ID == s.ChaserID, Connected: p.Connected,
+			Status: p.Status, CashBuilt: p.CashBuilt, Banked: p.Banked, Queued: queued[p.ID],
+		})
+	}
+	if out.Players == nil {
+		out.Players = []PlayerView{}
+	}
+
+	if v.Role == "player" {
+		if p := s.player(v.PlayerID); p != nil {
+			out.Me = &MeView{
+				ID: p.ID, Name: p.Name, IsChaser: p.ID == s.ChaserID, IsCurrent: p.ID == s.CurrentID,
+				Finalist: s.isFinalist(p.ID), Vote: p.Vote,
+			}
+		}
+	}
+	if host {
+		out.Log = s.Log
+	}
+
+	switch s.Phase {
+	case PhaseCBReady, PhaseCBPlaying, PhaseCBDone:
+		cb := &CBView{
+			Correct: s.CB.Correct, Total: s.CB.Correct * s.cfg.CashPerCorrect,
+			Asked: s.CB.Asked, EndsAt: ms(s.CB.EndsAt),
+		}
+		if s.CB.Q != nil {
+			cb.Question = s.CB.Q.Q
+			if host {
+				cb.Answer = s.CB.Q.A
+			}
+		}
+		out.CB = cb
+	}
+
+	switch s.Phase {
+	case PhaseOffersSet, PhaseOffersChoose, PhaseH2HReady, PhaseH2HQuestion, PhaseH2HReveal, PhaseH2HOver:
+		out.Offers = &OffersView{
+			Lower: s.Offers.Lower, Middle: s.Offers.Middle, Higher: s.Offers.Higher,
+			SuggestLower: s.Offers.SuggestLower, SuggestHigher: s.Offers.SuggestHigher,
+			Choice: s.Offers.Choice, Amount: s.Offers.Amount(),
+			Set: s.Phase != PhaseOffersSet,
+		}
+	}
+
+	switch s.Phase {
+	case PhaseH2HReady, PhaseH2HQuestion, PhaseH2HReveal, PhaseH2HOver:
+		h := s.H2H
+		hv := &H2HView{
+			Start: h.Start, PlayerPos: h.PlayerPos, ChaserPos: h.ChaserPos, QNum: h.QNum,
+			PlayerLocked: h.PlayerPick != pickNone, ChaserLocked: h.ChaserPick != pickNone,
+			DeadlineAt: ms(h.Deadline), Outcome: "",
+		}
+		if h.Q != nil && s.Phase != PhaseH2HReady {
+			hv.Question = h.Q.Q
+			hv.Options = h.Q.Options[:]
+		}
+		revealed := s.Phase == PhaseH2HReveal || s.Phase == PhaseH2HOver
+		if revealed {
+			hv.Reveal = &RevealV{PlayerPick: h.PlayerPick, ChaserPick: h.ChaserPick,
+				PlayerRight: h.PlayerRight, ChaserRight: h.ChaserRight}
+			ans := h.Q.Answer
+			hv.Correct = &ans
+			hv.Outcome = h.Outcome
+		} else if host && h.Q != nil {
+			ans := h.Q.Answer
+			hv.Correct = &ans
+		}
+		// Players see their own pick before the reveal, never the other side's.
+		if v.Role == "player" && h.Q != nil {
+			pick := pickNone
+			switch v.PlayerID {
+			case s.ChaserID:
+				pick = h.ChaserPick
+			case s.CurrentID:
+				pick = h.PlayerPick
+			}
+			if pick >= 0 {
+				hv.MyPick = &pick
+			}
+		}
+		out.H2H = hv
+	}
+
+	switch s.Phase {
+	case PhaseFinalPick, PhaseFinalTeamReady, PhaseFinalTeam, PhaseFinalTeamDone,
+		PhaseFinalChaser, PhaseFinalPush, PhaseGameOver:
+		f := s.Final
+		fv := &FinalView{
+			Finalists: append([]string{}, f.Finalists...), Voted: []string{},
+			TeamSet: f.TeamSet, ChaserSet: f.ChaserSet, Head: f.Head,
+			TeamCorrect: f.TeamCorrect, ChaserCorrect: f.ChaserCorrect, Pushbacks: f.Pushbacks,
+			Target: f.Target(), QNum: f.QNum, BuzzedBy: f.BuzzedBy,
+			Running: f.Running, EndsAt: ms(f.EndsAt), RemainingMs: f.Remaining.Milliseconds(),
+		}
+		if !f.Running {
+			fv.EndsAt = 0
+		}
+		for _, id := range f.Finalists {
+			if p := s.player(id); p != nil && p.Vote != "" {
+				fv.Voted = append(fv.Voted, id)
+			}
+		}
+		if host {
+			fv.Votes = map[string]string{}
+			for _, id := range f.Finalists {
+				if p := s.player(id); p != nil && p.Vote != "" {
+					fv.Votes[id] = p.Vote
+				}
+			}
+		}
+		if f.Q != nil {
+			fv.Question = f.Q.Q
+			if host {
+				fv.Answer = f.Q.A
+			}
+		}
+		out.Final = fv
 	}
 	return out
-}
-
-type RevealInfo struct {
-	VoterName   string  `json:"voterName"`
-	VotedForID  string  `json:"-"`
-	VotedForName *string `json:"votedForName"`
-	Index       int     `json:"index"`
-	Total       int     `json:"total"`
-}
-
-func (s *State) revealInfo() *RevealInfo {
-	if !s.Revealing || s.RevealOrder == nil {
-		return nil
-	}
-	targetID := s.RevealOrder[s.RevealIndex]
-	voter := s.FindPlayer(targetID)
-	votedForID, voted := s.Votes[targetID]
-	var votedForName *string
-	if voted {
-		if vf := s.FindPlayer(votedForID); vf != nil {
-			votedForName = &vf.Name
-		}
-	}
-	voterName := ""
-	if voter != nil {
-		voterName = voter.Name
-	}
-	return &RevealInfo{VoterName: voterName, VotedForName: votedForName, Index: s.RevealIndex, Total: len(s.RevealOrder)}
-}
-
-// ShootoutPublic omits the answer text (player/host view) but still carries
-// the question text itself — the host's big screen shows shootout questions
-// the same way it shows regular-round questions, just never the answer.
-type ShootoutPublic struct {
-	Order             []ShootoutSeat  `json:"order"`
-	Rounds            []ShootoutRound `json:"rounds"`
-	CurrentRoundIndex int             `json:"currentRoundIndex"`
-	CurrentTurn       int             `json:"currentTurn"`
-	Sudden            bool            `json:"sudden"`
-	WinnerID          string          `json:"winnerId"`
-	CurrentQuestion   *PlayerQuestion `json:"currentQuestion"`
-}
-
-// ShootoutController additionally includes the current question's answer.
-type ShootoutController struct {
-	ShootoutPublic
-	CurrentQuestion *Question `json:"currentQuestion"`
-}
-
-type ShootoutSeat struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
-}
-
-func (s *State) shootoutSeats() []ShootoutSeat {
-	sh := s.Shootout
-	seats := make([]ShootoutSeat, 2)
-	for i, id := range sh.Order {
-		name := ""
-		if p := s.FindPlayer(id); p != nil {
-			name = p.Name
-		}
-		seats[i] = ShootoutSeat{ID: id, Name: name}
-	}
-	return seats
-}
-
-func (s *State) shootoutPublic() *ShootoutPublic {
-	if s.Shootout == nil {
-		return nil
-	}
-	var cq *PlayerQuestion
-	if s.Shootout.CurrentQuestion != nil {
-		cq = &PlayerQuestion{Q: s.Shootout.CurrentQuestion.Q}
-	}
-	return &ShootoutPublic{
-		Order: s.shootoutSeats(), Rounds: s.Shootout.Rounds,
-		CurrentRoundIndex: s.Shootout.CurrentRoundIndex, CurrentTurn: s.Shootout.CurrentTurn,
-		Sudden: s.Shootout.Sudden, WinnerID: s.Shootout.WinnerID, CurrentQuestion: cq,
-	}
-}
-
-func (s *State) shootoutController() *ShootoutController {
-	base := s.shootoutPublic()
-	if base == nil {
-		return nil
-	}
-	return &ShootoutController{ShootoutPublic: *base, CurrentQuestion: s.Shootout.CurrentQuestion}
-}
-
-// PlayerQuestion strips the answer, matching {q} on the wire for players/host.
-type PlayerQuestion struct {
-	Q string `json:"q"`
-}
-
-// PlayerState is broadcast to each player individually (MyID/VotedAlready are
-// per-recipient) and, with MyID/VotedAlready omitted, to the host display too.
-type PlayerState struct {
-	Phase           Phase           `json:"phase"`
-	RoomCode        string          `json:"roomCode"`
-	Players         []PlayerPublic  `json:"players"`
-	ChainIndex      int             `json:"chainIndex"`
-	ChainValue      int             `json:"chainValue"`
-	Bank            int             `json:"bank"`
-	Round           int             `json:"round"`
-	CurrentAskedID  string          `json:"currentAskedId"`
-	CurrentQuestion *PlayerQuestion `json:"currentQuestion"`
-	Timer           Timer           `json:"timer"`
-	CountdownEndsAt int64           `json:"countdownEndsAt"`
-	MyID            string          `json:"myId,omitempty"`
-	VotedAlready    bool            `json:"votedAlready,omitempty"`
-	Revealing       bool            `json:"revealing"`
-	RevealInfo      *RevealInfo     `json:"revealInfo"`
-	LastElimination *Elimination    `json:"lastElimination"`
-	Shootout        *ShootoutPublic `json:"shootout"`
-	Winner          string          `json:"winner,omitempty"`
-}
-
-func (s *State) chainValue() int {
-	if s.ChainIndex >= 0 {
-		return ChainValues[s.ChainIndex]
-	}
-	return 0
-}
-
-func (s *State) currentQuestionPublic() *PlayerQuestion {
-	if s.CurrentQuestion == nil {
-		return nil
-	}
-	return &PlayerQuestion{Q: s.CurrentQuestion.Q}
-}
-
-// ToPlayerState builds the sanitized view for a specific player (forPlayerID
-// may be "" for the host/spectator display, which gets the same shape minus
-// the per-player fields).
-func (s *State) ToPlayerState(forPlayerID string) PlayerState {
-	_, voted := s.Votes[forPlayerID]
-	return PlayerState{
-		Phase: s.Phase, RoomCode: s.RoomCode,
-		Players: toPlayerPublic(s.Players),
-		ChainIndex: s.ChainIndex, ChainValue: s.chainValue(), Bank: s.Bank, Round: s.Round,
-		CurrentAskedID: s.CurrentAskedID, CurrentQuestion: s.currentQuestionPublic(),
-		Timer: s.Timer, CountdownEndsAt: s.CountdownEndsAt,
-		MyID: forPlayerID, VotedAlready: forPlayerID != "" && voted,
-		Revealing: s.Revealing, RevealInfo: s.revealInfo(),
-		LastElimination: s.LastElimination, Shootout: s.shootoutPublic(), Winner: s.Winner,
-	}
-}
-
-// ControllerQuestion includes the answer — the quizmaster is the only role allowed to see it.
-type ControllerQuestion struct {
-	Q string `json:"q"`
-	A string `json:"a"`
-}
-
-type ControllerState struct {
-	Phase             Phase                `json:"phase"`
-	RoomCode          string               `json:"roomCode"`
-	Round             int                  `json:"round"`
-	Players           []PlayerPublic       `json:"players"`
-	ChainIndex        int                  `json:"chainIndex"`
-	ChainValue        int                  `json:"chainValue"`
-	Bank              int                  `json:"bank"`
-	CurrentAskedID    string               `json:"currentAskedId"`
-	AskedName         string               `json:"askedName,omitempty"`
-	CurrentQuestion   *ControllerQuestion  `json:"currentQuestion"`
-	Timer             Timer                `json:"timer"`
-	CountdownEndsAt   int64                `json:"countdownEndsAt"`
-	VotedCount        int                  `json:"votedCount"`
-	Revealing         bool                 `json:"revealing"`
-	RevealOrder       []string             `json:"revealOrder"`
-	RevealIndex       int                  `json:"revealIndex"`
-	RevealInfo        *RevealInfo          `json:"revealInfo"`
-	TieCandidates     []string             `json:"tieCandidates"`
-	LastElimination   *Elimination         `json:"lastElimination"`
-	Shootout          *ShootoutController  `json:"shootout"`
-	Winner            string               `json:"winner,omitempty"`
-	QuestionBankCount int                  `json:"questionBankCount"`
-	UsingCustom       bool                 `json:"usingCustom"`
-	Log               []LogEntry           `json:"log"`
-}
-
-func (s *State) ToControllerState() ControllerState {
-	var askedName string
-	if p := s.FindPlayer(s.CurrentAskedID); p != nil {
-		askedName = p.Name
-	}
-	var cq *ControllerQuestion
-	if s.CurrentQuestion != nil {
-		cq = &ControllerQuestion{Q: s.CurrentQuestion.Q, A: s.CurrentQuestion.A}
-	}
-	return ControllerState{
-		Phase: s.Phase, RoomCode: s.RoomCode, Round: s.Round,
-		Players: toPlayerPublic(s.Players),
-		ChainIndex: s.ChainIndex, ChainValue: s.chainValue(), Bank: s.Bank,
-		CurrentAskedID: s.CurrentAskedID, AskedName: askedName, CurrentQuestion: cq,
-		Timer: s.Timer, CountdownEndsAt: s.CountdownEndsAt,
-		VotedCount: len(s.Votes),
-		Revealing: s.Revealing, RevealOrder: s.RevealOrder, RevealIndex: s.RevealIndex, RevealInfo: s.revealInfo(),
-		TieCandidates: s.TieCandidates,
-		LastElimination: s.LastElimination, Shootout: s.shootoutController(), Winner: s.Winner,
-		QuestionBankCount: len(s.QuestionBank), UsingCustom: s.UsingCustom,
-		Log: s.Log,
-	}
 }

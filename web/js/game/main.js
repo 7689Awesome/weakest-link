@@ -1,242 +1,272 @@
-// App bootstrap: landing view, the render() dispatcher, global delegated
-// event listeners, the lightweight timer ticker, and startup (auto-rejoin /
-// ?join=CODE handling) — the direct port of the original file's tail IIFE.
+// Entry point. The URL decides the role:
+//   /                      landing (host / join / big screen)
+//   /?join=CODE            join form for a room
+//   /?play=CODE            a player's phone (seat is remembered in localStorage)
+//   /?host=CODE[&key=K]    the quizmaster's controller
+//   /?screen=CODE          the shared big screen
+//   /host   (host.html)    bookmarkable quizmaster entry: new game or resume
+//   /screen (screen.html)  bookmarkable TV entry: asks for the code
+import { html, $ } from '../core/dom.js';
+import { api, connect } from '../core/net.js';
+import { syncClock, now, tickClocks } from '../core/clock.js';
+import { unlock, play } from '../core/sound.js';
+import { screenView, screenSfx } from './screen.js';
+import { hostView, hostKey, draft as hostDraft } from './host.js';
+import { playerView, offerDraft } from './player.js';
 
-import { $, getQueryParam, fmtClock } from '../core/dom.js';
-import { session } from '../core/storage.js';
-import * as sound from '../core/sound.js';
-import {
-  role, localView, setLocalView, setPendingJoinCode, HOST, CTRL, P, onRender, Actions, Binds, Changes, clockNow,
-} from './state.js';
-import { hostSetupView, hostRootView, connectHost } from './host.js';
-import { controllerSetupView, controllerRootView, connectController } from './controller.js';
-import { playerSetupView, playerRootView, connectPlayer } from './player.js';
+const app = $('#app');
+const params = new URLSearchParams(location.search);
+const store = {
+  get: (k) => { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
+  set: (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* private mode */ } },
+  del: (k) => { try { localStorage.removeItem(k); } catch { /* ignore */ } },
+};
+const clean = (c) => String(c || '').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 4);
 
-// Ambient background "embers" — faint drifting sparks that rise slowly
-// behind the landing hero. Purely decorative (aria-hidden, pointer-events
-// disabled via CSS), randomized per mount via inline custom properties so
-// the CSS keyframes (defined in landing.css) can stay generic.
-function landingEmbers(count) {
-  let out = '';
-  for (let i = 0; i < count; i++) {
-    const x = (Math.random() * 100).toFixed(1);
-    const size = (Math.random() * 3 + 2).toFixed(1);
-    const dur = (Math.random() * 10 + 10).toFixed(1);
-    const delay = (-Math.random() * dur).toFixed(1);
-    const drift = (Math.random() * 44 - 22).toFixed(0);
-    const op = (Math.random() * 0.25 + 0.15).toFixed(2);
-    out += `<span class="ember" style="--x:${x}%;--size:${size}px;--dur:${dur}s;--delay:${delay}s;--drift:${drift}px;--op:${op}"></span>`;
-  }
-  return out;
-}
+let role = null;
+let conn = null;
+let state = null;
+let prev = null;
+let lastHTML = '';
+let soundOn = false;
+const ctx = { error: '', offline: false };
+let errTimer = null;
 
-// A handful of the same two-ring "chain link" brand motif, shrunk way down,
-// scattered behind the hero and set adrift with a slow rotate/float loop —
-// echoes the logo mark without competing with it.
-function landingChainDrift(count) {
-  let out = '';
-  for (let i = 0; i < count; i++) {
-    const top = (Math.random() * 90 + 4).toFixed(1);
-    const left = (Math.random() * 90 + 4).toFixed(1);
-    const size = (Math.random() * 26 + 22).toFixed(0);
-    const dur = (Math.random() * 10 + 14).toFixed(1);
-    const delay = (-Math.random() * dur).toFixed(1);
-    const rot = (Math.random() * 360).toFixed(0);
-    const op = (Math.random() * 0.12 + 0.08).toFixed(2);
-    out += `
-      <svg class="drift-link" style="--top:${top}%;--left:${left}%;--size:${size}px;--dur:${dur}s;--delay:${delay}s;--rot:${rot}deg;--op:${op}" viewBox="0 0 32 32" aria-hidden="true">
-        <g fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round">
-          <ellipse cx="12" cy="12.5" rx="6.2" ry="5" transform="rotate(-32 12 12.5)"/>
-          <ellipse cx="20" cy="19.5" rx="6.2" ry="5" transform="rotate(-32 20 19.5)"/>
-        </g>
-      </svg>`;
-  }
-  return out;
-}
+// ---------------------------------------------------------------- landing
 
-function landingView() {
-  return `
+function landing(message = '', prefillJoin = '') {
+  const lastSeat = Object.keys(localStorage).find((k) => k.startsWith('chase.seat.'));
+  const seatCode = lastSeat ? lastSeat.replace('chase.seat.', '') : '';
+  app.innerHTML = String(html`
     <div class="landing">
-      <div class="landing-ambient" aria-hidden="true">
-        ${landingEmbers(13)}
-        ${landingChainDrift(5)}
+      <header>
+        <h1>Chase Night</h1>
+        <p>A quiz-show party game. One chaser, up to four players, and a TV.</p>
+      </header>
+      ${message ? html`<div class="toast" role="alert">${message}</div>` : ''}
+      <div class="cards">
+        <section class="card">
+          <h2>Host a game</h2>
+          <p>You’re the quizmaster. You’ll get the controller on this device, and a code for the TV and phones.</p>
+          <button class="btn primary block" data-local="create">Create a room</button>
+        </section>
+        <section class="card">
+          <h2>Join a game</h2>
+          <form data-form="join">
+            <label>Room code<input name="code" value="${prefillJoin}" maxlength="4" autocapitalize="characters" autocomplete="off" required placeholder="ABCD"></label>
+            <label>Your name<input name="name" maxlength="16" autocomplete="nickname" required></label>
+            <button class="btn primary block">Join</button>
+          </form>
+          ${seatCode ? html`<p class="hint"><a href="/?play=${seatCode}">Rejoin room ${seatCode}</a></p>` : ''}
+        </section>
+        <section class="card">
+          <h2>Show the big screen</h2>
+          <p>Open this on the TV and enter the room code.</p>
+          <form data-form="screen">
+            <label>Room code<input name="code" maxlength="4" autocapitalize="characters" autocomplete="off" required placeholder="ABCD"></label>
+            <button class="btn ghost block">Show on this screen</button>
+          </form>
+        </section>
       </div>
-      <div class="landing-glow" aria-hidden="true"></div>
-      <svg class="brand-mark" viewBox="0 0 32 32" width="76" height="76" aria-hidden="true">
-        <g fill="none" stroke="url(#brandMarkGold)" stroke-width="4" stroke-linecap="round">
-          <ellipse cx="12" cy="12.5" rx="6.2" ry="5" transform="rotate(-32 12 12.5)"/>
-          <ellipse cx="20" cy="19.5" rx="6.2" ry="5" transform="rotate(-32 20 19.5)"/>
-        </g>
-        <defs>
-          <linearGradient id="brandMarkGold" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stop-color="#fff"/>
-            <stop offset="100%" stop-color="#e8b23d"/>
-          </linearGradient>
-        </defs>
-      </svg>
-      <h1 class="brand">Chain <span>Reaction</span></h1>
-      <div class="landing-card">
-        <p class="tag">A fast-paced trivia elimination party game. Pick a big screen to host on, grab your phones, and find out who's the weakest link.</p>
-        <div class="landing-btns">
-          <button class="big-btn gold" data-action="goHostSetup">Host on this screen</button>
-          <button class="big-btn ghost" data-action="goPlayerSetup">Join as a player</button>
-        </div>
-      </div>
-      <div class="landing-footer">
-        <span>created by axiomatic7689</span>
-      </div>
-    </div>
-  `;
+    </div>`);
 }
 
-function rootView() {
-  if (role === 'host') return hostRootView();
-  if (role === 'controller') return controllerRootView();
-  if (role === 'player') return playerRootView();
-  if (localView === 'hostSetup') return hostSetupView();
-  if (localView === 'playerSetup') return playerSetupView();
-  if (localView === 'controllerSetup') return controllerSetupView();
-  return landingView();
+// Bookmarkable /host page: start a new game, or resume one this device was running.
+async function hostLanding(message = '') {
+  app.innerHTML = String(html`<div class="landing"><header><h1>Quizmaster</h1><p>Run the game from this device.</p></header>
+    ${message ? html`<div class="toast" role="alert">${message}</div>` : ''}
+    <div class="cards"><section class="card"><h2>New game</h2>
+      <p>Creates a room code for the TV and phones.</p>
+      <button class="btn primary block" data-local="create">Start a new game</button></section>
+      <section class="card" id="resume" hidden><h2>Resume</h2><ul class="people" id="resume-list"></ul></section></div></div>`);
+  const codes = Object.keys(localStorage).filter((k) => k.startsWith('chase.host.')).map((k) => k.slice(11));
+  const alive = [];
+  for (const code of codes) {
+    try {
+      const info = await api('GET', `/api/rooms/${code}`);
+      if (info.exists) alive.push({ code, phase: info.phase, n: info.playerCount });
+      else store.del(`chase.host.${code}`);
+    } catch { /* offline: skip */ }
+  }
+  if (!alive.length) return;
+  $('#resume').hidden = false;
+  $('#resume-list').innerHTML = alive.map((r) =>
+    `<li><b class="code">${r.code}</b><span class="grow"></span><span class="hint">${r.n} player${r.n === 1 ? '' : 's'}</span> <a class="btn small primary" href="/?host=${r.code}">Resume</a></li>`).join('');
+}
+
+// Bookmarkable /screen page for the TV: just ask for the code.
+function screenLanding() {
+  app.innerHTML = String(html`<div class="landing"><header><h1>Big screen</h1><p>Enter the room code shown on the quizmaster’s device.</p></header>
+    <section class="card"><form data-form="screen"><label>Room code<input name="code" maxlength="4" autocapitalize="characters" autocomplete="off" required autofocus placeholder="ABCD"></label>
+    <button class="btn primary block">Show on this screen</button></form></section></div>`);
+}
+
+async function createRoom() {
+  try {
+    const r = await api('POST', '/api/rooms');
+    store.set(`chase.host.${r.roomCode}`, r.hostKey);
+    location.assign(`/?host=${r.roomCode}`);
+  } catch (e) { (document.body.dataset.entry === 'host' ? hostLanding : landing)(e.message); }
+}
+
+async function joinRoom(code, name) {
+  code = clean(code);
+  try {
+    const info = await api('GET', `/api/rooms/${code}`);
+    if (!info.exists) throw new Error('That room does not exist. Check the code.');
+    const seat = store.get(`chase.seat.${code}`);
+    const body = { name };
+    if (seat) { body.rejoinId = seat.id; body.rejoinToken = seat.token; }
+    const r = await api('POST', `/api/rooms/${code}/players`, body);
+    store.set(`chase.seat.${code}`, { id: r.playerId, token: r.playerToken, name });
+    location.assign(`/?play=${code}`);
+  } catch (e) { landing(e.message, code); }
+}
+
+// ---------------------------------------------------------------- game shell
+
+function fatal(msg, withJoinLink = '') {
+  conn?.close();
+  app.innerHTML = String(html`<div class="landing"><header><h1>Chase Night</h1></header>
+    <div class="card center"><h2>${msg}</h2>
+    ${withJoinLink ? html`<a class="btn primary" href="/?join=${withJoinLink}">Join again</a>` : html`<a class="btn primary" href="/">Back to start</a>`}</div></div>`);
 }
 
 function render() {
-  $('#app').innerHTML = rootView();
+  if (!state) return;
+  const view = role === 'screen' ? screenView(state)
+    : role === 'host' ? hostView(state, ctx)
+    : playerView(state, ctx);
+  const out = String(view);
+  if (out !== lastHTML) {
+    const active = document.activeElement;
+    const key = active?.dataset?.draft;
+    app.innerHTML = out;
+    lastHTML = out;
+    if (role === 'screen' && !soundOn) {
+      app.insertAdjacentHTML('beforeend', '<button class="sound-hint" data-local="unlock">Click to enable sound</button>');
+    }
+    if (key) app.querySelector(`[data-draft="${key}"]`)?.focus();
+  }
+  tickClocks(app);
 }
-onRender(render);
 
-// --- navigation + global actions --------------------------------------------------------
+function showError(msg) {
+  ctx.error = msg;
+  render();
+  clearTimeout(errTimer);
+  errTimer = setTimeout(() => { ctx.error = ''; render(); }, 3500);
+}
 
-Actions.goHostSetup = () => { setLocalView('hostSetup'); render(); };
-Actions.goPlayerSetup = () => { setLocalView('playerSetup'); render(); };
-Actions.goControllerSetup = () => { setLocalView('controllerSetup'); render(); };
-Actions.goBack = () => { setLocalView('landing'); render(); };
-Actions.toggleSound = () => { sound.setMuted(!sound.isMuted()); render(); };
+function start(r, code, params2) {
+  role = r;
+  document.body.dataset.role = r;
+  conn = connect(params2, {
+    onState: (s) => {
+      syncClock(s.now);
+      prev = state;
+      state = s;
+      if (role === 'screen' && soundOn) screenSfx(prev, s);
+      render();
+    },
+    onError: showError,
+    onStatus: (st) => { ctx.offline = st === 'offline'; render(); },
+    onFatal: ({ code: c, reason }) => {
+      if (role === 'player') {
+        if (c === 4001) return fatal('This seat is open on another device.');
+        store.del(`chase.seat.${code}`);
+        return fatal(reason || 'This room has ended.', c === 4004 ? '' : code);
+      }
+      return fatal(reason || 'This room has ended.');
+    },
+  });
+}
 
-// --- global delegated event listeners ----------------------------------------------------
+// ---------------------------------------------------------------- events
+
+const draftFor = () => (role === 'host' ? hostDraft : offerDraft);
 
 document.addEventListener('click', (e) => {
-  const el = e.target.closest('[data-action]');
-  if (!el) return;
-  const action = el.getAttribute('data-action');
-  const arg = el.getAttribute('data-arg');
-  if (typeof Actions[action] === 'function') Actions[action](arg, el);
+  if (!soundOn && role === 'screen') { unlock(); soundOn = true; $('.sound-hint')?.remove(); }
+  const el = e.target.closest('[data-send],[data-local],[data-offers]');
+  if (!el || el.disabled) return;
+
+  if (el.dataset.send) {
+    let arg = {};
+    try { arg = JSON.parse(el.dataset.arg || '{}'); } catch { /* ignore */ }
+    conn?.send(el.dataset.send, el.dataset.action, arg);
+    if (el.dataset.action === 'lock' || el.dataset.action === 'buzz') navigator.vibrate?.(30);
+  } else if (el.dataset.offers) {
+    const d = draftFor();
+    conn?.send(el.dataset.offers, 'setOffers', { lower: Number(d.lower), higher: Number(d.higher) });
+  } else if (el.dataset.local === 'create') createRoom();
+  else if (el.dataset.local === 'unlock') { unlock(); soundOn = true; el.remove(); play('start'); }
+  else if (el.dataset.local === 'copyJoin') copy(`${location.origin}/?join=${state.code}`, 'Join link copied');
+  else if (el.dataset.local === 'copyHost') copy(`${location.origin}/?host=${state.code}&key=${store.get(`chase.host.${state.code}`)}`, 'Controller link copied: keep it private');
 });
+
+function copy(text, msg) {
+  navigator.clipboard?.writeText(text).then(() => showError(msg), () => showError(text));
+}
 
 document.addEventListener('input', (e) => {
-  const el = e.target;
-  const bind = el.getAttribute && el.getAttribute('data-bind');
-  if (bind && typeof Binds[bind] === 'function') Binds[bind](el.value, el);
+  const k = e.target.dataset?.draft;
+  if (k) draftFor()[k] = e.target.value;
+  if (e.target.name === 'code') e.target.value = clean(e.target.value);
 });
 
-document.addEventListener('change', (e) => {
-  const el = e.target;
-  const bind = el.getAttribute && el.getAttribute('data-bind');
-  if (bind && typeof Changes[bind] === 'function') Changes[bind](el, e);
+document.addEventListener('submit', (e) => {
+  const form = e.target.closest('[data-form]');
+  if (!form) return;
+  e.preventDefault();
+  const data = new FormData(form);
+  if (form.dataset.form === 'join') joinRoom(data.get('code'), String(data.get('name')).trim());
+  if (form.dataset.form === 'screen') location.assign(`/?screen=${clean(data.get('code'))}`);
 });
 
 document.addEventListener('keydown', (e) => {
-  if (typeof Actions.__keydown === 'function') Actions.__keydown(e);
+  if (role !== 'host' || !state || e.target.matches('input, textarea') || e.repeat) return;
+  const m = hostKey(state, e.key);
+  if (m) { e.preventDefault(); conn?.send('control', m.action, m.arg); }
 });
 
-// Unlock audio on the very first tap anywhere, as a catch-all in addition to
-// the explicit unlock() calls on create/join/controller-connect buttons.
-document.addEventListener('pointerdown', () => sound.unlock(), { once: true });
+// Live clocks + the last-ten-seconds tick on the big screen.
+let lastSec = -1;
+setInterval(() => {
+  tickClocks(app);
+  if (role !== 'screen' || !soundOn || !state) return;
+  const end = state.cb?.endsAt && state.phase === 'cb_playing' ? state.cb.endsAt
+    : state.final?.running ? state.final.endsAt : 0;
+  if (!end) { lastSec = -1; return; }
+  const sec = Math.ceil((end - now()) / 1000);
+  if (sec !== lastSec && sec > 0 && sec <= 10) play('tick');
+  lastSec = sec;
+}, 200);
 
-// --- lightweight live timer/countdown ticker --------------------------------------------
-// Patches only .js-timer/.js-countdown text nodes directly, never calling
-// render(), so the rest of the screen never re-mounts just for a ticking clock.
+// ---------------------------------------------------------------- boot
 
-let lastTickSecond = null;
+(function boot() {
+  const host = clean(params.get('host'));
+  const screen = clean(params.get('screen'));
+  const playCode = clean(params.get('play'));
+  const join = clean(params.get('join'));
 
-function activeState() {
-  if (role === 'host') return HOST.state;
-  if (role === 'controller') return CTRL.state;
-  if (role === 'player') return P.state;
-  return null;
-}
-
-function tickLiveTimers() {
-  const s = activeState();
-  let endsAt = null;
-  let running = false;
-  let cdEndsAt = null;
-  if (s) {
-    if (s.phase === 'playing') { endsAt = s.timer.endsAt; running = s.timer.running; }
-    if (s.phase === 'countdown') { cdEndsAt = s.countdownEndsAt; }
+  if (host) {
+    const key = params.get('key') || store.get(`chase.host.${host}`);
+    if (!key) return fatal('This device doesn’t have the controller key for that room.');
+    store.set(`chase.host.${host}`, key);
+    if (params.get('key')) history.replaceState(null, '', `/?host=${host}`);
+    return start('host', host, { role: 'host', code: host, key });
   }
+  if (screen) return start('screen', screen, { role: 'screen', code: screen });
+  if (playCode) {
+    const seat = store.get(`chase.seat.${playCode}`);
+    if (!seat) return location.replace(`/?join=${playCode}`);
+    return start('player', playCode, { role: 'player', code: playCode, playerId: seat.id, token: seat.token });
+  }
+  if (document.body.dataset.entry === 'host') return hostLanding();
+  if (document.body.dataset.entry === 'screen') return screenLanding();
+  return landing('', join);
+}());
 
-  const remaining = running ? endsAt - clockNow() : null;
-  const text = running ? fmtClock(remaining) : '--:--';
-  const low = running && remaining < 10000;
-  document.querySelectorAll('.js-timer').forEach((node) => {
-    node.textContent = text;
-    node.classList.toggle('low', !!low);
-  });
 
-  if (running) {
-    const wholeSecond = Math.ceil(remaining / 1000);
-    if (wholeSecond !== lastTickSecond && wholeSecond <= 10 && wholeSecond > 0) {
-      sound.tick(wholeSecond <= 3);
-    }
-    lastTickSecond = wholeSecond;
-  } else {
-    lastTickSecond = null;
-  }
-
-  if (cdEndsAt !== null) {
-    const secsLeft = Math.max(0, Math.ceil((cdEndsAt - clockNow()) / 1000));
-    document.querySelectorAll('.js-countdown').forEach((node) => {
-      node.textContent = secsLeft > 0 ? String(secsLeft) : 'GO!';
-    });
-  }
-}
-setInterval(tickLiveTimers, 500);
-
-// --- bootstrap -----------------------------------------------------------------------------
-
-function init() {
-  const sess = session.get('wlink_session', null);
-  if (sess && sess.roomCode && sess.playerId && sess.playerToken) {
-    connectPlayer(sess.roomCode, sess.myName || '', { playerId: sess.playerId, playerToken: sess.playerToken });
-    return;
-  }
-  // Same-tab refresh recovery for the big-screen display (mirrors the player
-  // session above) — falls back to the ?host=CODE link below if there's no
-  // session (a fresh tab/device, e.g. after the original tab was closed).
-  const hostSess = session.get('wlink_host_session', null);
-  if (hostSess && hostSess.roomCode) {
-    connectHost(hostSess.roomCode, hostSess.controllerKey);
-    return;
-  }
-  // Opened from the big screen's own "recovery URL" (or a bookmark of it) —
-  // reconnects the display to an already-running room, no secret needed.
-  const hostCode = getQueryParam('host');
-  if (hostCode) {
-    const clean = hostCode.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 4);
-    if (clean) {
-      connectHost(clean);
-      return;
-    }
-  }
-  // Opened from the "Open quizmaster controller" link on the host's lobby
-  // screen — connect straight in, no manual room-code entry needed.
-  const runCode = getQueryParam('run');
-  if (runCode) {
-    const clean = runCode.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 4);
-    if (clean) {
-      connectController(clean, getQueryParam('key') || '');
-      return;
-    }
-  }
-  const joinCode = getQueryParam('join');
-  if (joinCode) {
-    const clean = joinCode.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 4);
-    if (clean) {
-      setLocalView('playerSetup');
-      setPendingJoinCode(clean);
-    }
-  }
-  render();
-}
-
-init();

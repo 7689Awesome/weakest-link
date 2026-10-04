@@ -1,83 +1,129 @@
 package httpapi
 
 import (
-	"context"
 	"net/http"
+	"strings"
+	"sync"
 	"time"
 
-	"github.com/coder/websocket"
+	"github.com/gorilla/websocket"
 
-	wsconn "weakestlink/internal/ws"
+	"chase/internal/room"
 )
 
 const (
-	heartbeatInterval = 25 * time.Second
-	heartbeatTimeout  = 10 * time.Second
+	writeWait  = 10 * time.Second
+	pongWait   = 60 * time.Second
+	pingEvery  = 25 * time.Second
+	maxMsgSize = 4096
 )
 
-// handleWS upgrades the connection and attaches it to a room. Role and
-// identity come entirely from query params — there's no WS-level
-// "join"/"joinController" handshake message, because the server already
-// knows who's connecting: players present the playerId+token issued by
-// POST /api/rooms/{code}/players, and controller/host only need the room code.
-func (s *Server) handleWS(w http.ResponseWriter, r *http.Request) {
-	code := r.URL.Query().Get("code")
-	rm, ok := s.Rooms.Get(code)
-	if !ok {
-		http.Error(w, "room not found", http.StatusNotFound)
-		return
-	}
+var upgrader = websocket.Upgrader{ReadBufferSize: 2048, WriteBufferSize: 8192}
 
-	var role wsconn.Role
-	var playerID, token string
-	switch r.URL.Query().Get("role") {
-	case "player":
-		role = wsconn.RolePlayer
-		playerID = r.URL.Query().Get("playerId")
-		token = r.URL.Query().Get("token")
-		if playerID == "" || token == "" {
-			http.Error(w, "missing playerId/token", http.StatusBadRequest)
-			return
-		}
-	case "controller":
-		role = wsconn.RoleController
-		// A separate secret from the room code — see room.State.ControllerKey.
-		token = r.URL.Query().Get("key")
-	case "host":
-		role = wsconn.RoleHost
+// wsClient adapts a gorilla connection to room.Client. Send never blocks: a
+// client that cannot keep up is dropped rather than stalling the room actor.
+type wsClient struct {
+	conn *websocket.Conn
+	out  chan []byte
+	once sync.Once
+	done chan struct{}
+}
+
+func (c *wsClient) Send(data []byte) {
+	select {
+	case c.out <- data:
 	default:
-		http.Error(w, "invalid role", http.StatusBadRequest)
-		return
+		c.Close(websocket.CloseTryAgainLater, "too slow")
 	}
+}
 
-	// Same-origin only by default (Accept's built-in Origin check) — the
-	// frontend is always served from this same binary, so no cross-origin
-	// WebSocket access is ever legitimate here.
-	c, err := websocket.Accept(w, r, nil)
+func (c *wsClient) Close(code int, reason string) {
+	c.once.Do(func() {
+		_ = c.conn.WriteControl(websocket.CloseMessage,
+			websocket.FormatCloseMessage(code, reason), time.Now().Add(time.Second))
+		close(c.done)
+		_ = c.conn.Close()
+	})
+}
+
+// GET /ws?role=screen&code=X
+// GET /ws?role=host&code=X&key=K
+// GET /ws?role=player&code=X&playerId=Y&token=Z
+//
+// Identity comes from the URL, so there is no join handshake message and the
+// server can push the first state immediately. Rejections are reported in the
+// close frame's reason because no write pump exists yet.
+func (s *Server) serveWS(w http.ResponseWriter, r *http.Request) {
+	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		return
 	}
-	conn := wsconn.NewConn(c, role, code, playerID)
-
-	res := rm.Attach(conn, token)
-	if !res.OK {
-		// No write pump is running yet, so a JSON error message would never
-		// actually be flushed — the close frame's reason string is the only
-		// channel available here, and the browser exposes it as CloseEvent.reason.
-		c.Close(websocket.StatusPolicyViolation, res.Reason)
-		return
+	q := r.URL.Query()
+	reject := func(code int, reason string) {
+		_ = conn.WriteControl(websocket.CloseMessage,
+			websocket.FormatCloseMessage(code, reason), time.Now().Add(time.Second))
+		_ = conn.Close()
 	}
 
-	// The request's context is cancelled as soon as this handler returns, so
-	// the pumps run against their own context, torn down together via cancel
-	// once any one of them exits (read error, write error, or a missed heartbeat).
-	connCtx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	rm := s.mgr.Get(strings.ToUpper(q.Get("code")))
+	if rm == nil {
+		reject(room.CloseRoomGone, "that room no longer exists")
+		return
+	}
+	v := room.Viewer{Role: q.Get("role"), PlayerID: q.Get("playerId")}
+	secret := q.Get("key")
+	if v.Role == "player" {
+		secret = q.Get("token")
+	}
 
-	go wsconn.HeartbeatPump(connCtx, conn, heartbeatInterval, heartbeatTimeout)
-	go wsconn.WritePump(connCtx, conn)
-	wsconn.ReadPump(connCtx, conn,
-		func(data []byte) { rm.HandleClientMessage(conn, data) },
-		func() { rm.Detach(conn); cancel() },
-	)
+	c := &wsClient{conn: conn, out: make(chan []byte, 32), done: make(chan struct{})}
+	if err := rm.Attach(v, secret, c); err != nil {
+		reject(room.CloseBadAuth, err.Error())
+		return
+	}
+	go c.writePump()
+	c.readPump(rm)
+}
+
+func (c *wsClient) readPump(rm *room.Room) {
+	defer func() {
+		rm.Detach(c)
+		c.Close(websocket.CloseNormalClosure, "bye")
+	}()
+	c.conn.SetReadLimit(maxMsgSize)
+	_ = c.conn.SetReadDeadline(time.Now().Add(pongWait))
+	c.conn.SetPongHandler(func(string) error {
+		return c.conn.SetReadDeadline(time.Now().Add(pongWait))
+	})
+	for {
+		_, data, err := c.conn.ReadMessage()
+		if err != nil {
+			return
+		}
+		_ = c.conn.SetReadDeadline(time.Now().Add(pongWait))
+		rm.Incoming(c, data)
+	}
+}
+
+func (c *wsClient) writePump() {
+	t := time.NewTicker(pingEvery)
+	defer t.Stop()
+	for {
+		select {
+		case msg := <-c.out:
+			_ = c.conn.SetWriteDeadline(time.Now().Add(writeWait))
+			if err := c.conn.WriteMessage(websocket.TextMessage, msg); err != nil {
+				c.Close(websocket.CloseAbnormalClosure, "write failed")
+				return
+			}
+		case <-t.C:
+			_ = c.conn.SetWriteDeadline(time.Now().Add(writeWait))
+			if err := c.conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+				c.Close(websocket.CloseAbnormalClosure, "ping failed")
+				return
+			}
+		case <-c.done:
+			return
+		}
+	}
 }

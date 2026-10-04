@@ -1,545 +1,169 @@
-// Player (contestant's phone) module: setup screen, in-game views for every
-// server-driven phase, and the WebSocket networking glue. The server is
-// authoritative for all game state — this module only renders `P.state` and
-// forwards taps as `vote` / `callBank` / `rename` messages.
-
+// Phone views. Contestants and the chaser share a shell but see different
+// controls: the chaser makes offers and plays the head-to-head from the other
+// side; contestants choose offers, answer, vote for a set and buzz.
+import { html, money } from '../core/dom.js';
 import {
-  $, esc, fmtMoney, accuracyOf,
-} from '../core/dom.js';
-import { apiPost, createConnection, wsURL } from '../core/net.js';
-import { session } from '../core/storage.js';
-import * as sound from '../core/sound.js';
-import {
-  P, pendingJoinCode, setRole, setLocalView, render, Actions, Changes, syncClock,
-} from './state.js';
-import {
-  ladderHtml, bigTimerHtml, countdownHtml, standingsHtml, tallyHtml, spawnConfetti,
+  boardHTML, trackHTML, optionsHTML, rosterChips, clockEl, frozenEl, resultHTML,
+  nameOf, chaserOf, currentOf, stepsToHome,
 } from './components.js';
 
-// One-shot-per-terminal-state effect guards (module-level so they survive
-// re-renders of the same phase but reset once the room moves on).
-let confettiSpawned = false;
-let statPop = null; // 'correct' | 'incorrect' | null — drives the .p-stat bounce
-let statPopTimer = null;
+export const offerDraft = { lower: null, higher: null, forKey: '' };
 
-function markStatPop(kind) {
-  statPop = kind;
-  clearTimeout(statPopTimer);
-  statPopTimer = setTimeout(() => {
-    statPop = null;
-    render();
-  }, 400);
+const wait = (title, sub = '') => html`<div class="wait"><h2>${title}</h2>${sub ? html`<p>${sub}</p>` : ''}</div>`;
+
+function offerChoice(s) {
+  const o = s.offers;
+  const btn = (key, label, amount) => html`
+    <button class="offer-btn ${key}" data-send="act" data-action="chooseOffer" data-arg='${JSON.stringify({ choice: key })}'>
+      <span class="l">${label}</span><b>${money(amount)}</b><small>${stepsToHome(s, key)} correct to get home</small>
+    </button>`;
+  return html`<div class="offer-stack">
+    ${btn('higher', 'Higher offer · closer to the chaser', o.higher)}
+    ${btn('middle', 'Your cash builder', o.middle)}
+    ${btn('lower', 'Lower offer · further away', o.lower)}
+  </div>`;
 }
 
-// One-shot flag for the turn-flag's entrance bounce: true only for the
-// render right after this device FIRST becomes "on the spot" (either the
-// regular per-round asked player, or the active shootout duellist) — so the
-// bounce plays once when a turn starts rather than looping the whole time
-// the "yours" glow is showing.
-let turnPop = false;
-let turnPopTimer = null;
-
-function markTurnPop() {
-  turnPop = true;
-  clearTimeout(turnPopTimer);
-  turnPopTimer = setTimeout(() => {
-    turnPop = false;
-    render();
-  }, 500);
-}
-
-function isMyTurnNow(s) {
-  if (!s) return false;
-  if (s.phase === 'playing') return s.currentAskedId === P.myId;
-  if (s.phase === 'shootout' && s.shootout) {
-    const turnPlayer = s.shootout.order[s.shootout.currentTurn];
-    return !!turnPlayer && turnPlayer.id === P.myId;
+function offerForm(s) {
+  const key = `${s.currentId}`;
+  if (offerDraft.forKey !== key) {
+    offerDraft.forKey = key;
+    offerDraft.lower = s.offers.suggestLower;
+    offerDraft.higher = s.offers.suggestHigher;
   }
-  return false;
+  return html`
+    <div class="offer-form">
+      <label>Higher offer<input type="number" inputmode="numeric" step="1000" data-draft="higher" value="${offerDraft.higher}"></label>
+      <div class="mid">${nameOf(s, s.currentId)}’s cash builder <b>${money(s.offers.middle)}</b></div>
+      <label>Lower offer<input type="number" inputmode="numeric" step="1000" data-draft="lower" value="${offerDraft.lower}"></label>
+      <button class="btn primary block" data-offers="act">Make the offers</button>
+    </div>`;
 }
 
-// Which single shootout kick (round index + side) just transitioned from
-// unscored to correct/incorrect, if any — recomputed fresh on every message
-// so it naturally reads as null again once that round is no longer the
-// newest change (no timer needed: unlike a plain visual flag, this is a
-// direct diff of server data, not something we set-and-forget).
-function freshKickSlot(prevRounds, nextRounds) {
-  for (let i = 0; i < nextRounds.length; i++) {
-    const cur = nextRounds[i];
-    if (!cur) continue;
-    const prevRound = prevRounds[i];
-    if (cur.p0 && (!prevRound || !prevRound.p0)) return { index: i, side: 'p0' };
-    if (cur.p1 && (!prevRound || !prevRound.p1)) return { index: i, side: 'p1' };
-  }
-  return null;
-}
-let freshKick = null;
-
-function getMe(s) {
-  return s.players.find((p) => p.id === s.myId) || {
-    correct: 0, incorrect: 0, alive: true, name: P.myName,
-  };
-}
-
-function everyoneProgress(players) {
-  return `
-    <div class="everyone-label">Everyone's progress</div>
-    ${standingsHtml(players)}
-  `;
-}
-
-// ---------------- networking ----------------
-
-function handleMessage(msg) {
-  syncClock(msg.now);
-  if (msg.type === 'state') {
-    const prevState = P.state;
-    const prevPhase = prevState && prevState.phase;
-    const prevMe = prevState ? prevState.players.find((p) => p.id === P.myId) : null;
-    const prevAlive = prevMe ? prevMe.alive : undefined;
-    const wasMyTurnBefore = isMyTurnNow(prevState);
-    const prevRounds = (prevState && prevState.shootout && prevState.shootout.rounds) || [];
-    const nextRounds = (msg.state.shootout && msg.state.shootout.rounds) || [];
-    freshKick = freshKickSlot(prevRounds, nextRounds);
-
-    P.state = msg.state;
-    P.connLost = false;
-    if (msg.state.phase !== 'voting') { P.localVoted = false; P.voteDraft = null; }
-
-    const meNow = msg.state.players.find((p) => p.id === P.myId);
-
-    // Sound moments this module owns: your own elimination, and entering gameover.
-    if (prevAlive === true && meNow && meNow.alive === false) {
-      sound.eliminate();
-    }
-
-    if (prevMe && meNow) {
-      if (meNow.correct > prevMe.correct) markStatPop('correct');
-      else if (meNow.incorrect > prevMe.incorrect) markStatPop('incorrect');
-    }
-
-    if (isMyTurnNow(msg.state) && !wasMyTurnBefore) {
-      markTurnPop();
-    }
-
-    if (prevPhase && prevPhase !== 'gameover' && msg.state.phase === 'gameover') {
-      sound.win();
-      if (!confettiSpawned) {
-        confettiSpawned = true;
-        spawnConfetti(document.body, 40);
-      }
-    }
-    if (msg.state.phase !== 'gameover') {
-      // Reset once the room moves on so a future game-over spawns confetti again.
-      confettiSpawned = false;
-    }
-  } else if (msg.type === 'kicked') {
-    P.denied = 'You were removed from the game by the host.';
-    session.remove('wlink_session');
-    if (P.conn) P.conn.close(); // definitive — stop net.js's auto-reconnect
-  } else if (msg.type === 'roomClosed') {
-    P.denied = 'The host has closed this room.';
-    session.remove('wlink_session');
-    if (P.conn) P.conn.close(); // definitive — stop net.js's auto-reconnect against a room that's now gone
-  } else if (msg.type === 'renameFailed') {
-    P.renameError = msg.reason;
-  }
-  render();
-}
-
-export function connectPlayer(code, name, creds) {
-  // creds = {playerId, playerToken} — always required now (from the REST join
-  // response, or a stored session on auto-rejoin). There is no server
-  // "welcome" message anymore, so P.myId is set immediately from creds.
-  setRole('player');
-  P.roomCode = code;
-  P.myName = name;
-  P.myId = creds.playerId;
-  P.myToken = creds.playerToken;
-  P.error = null;
-  P.denied = null;
-  session.set('wlink_session', {
-    roomCode: code, playerId: creds.playerId, playerToken: creds.playerToken, myName: name,
-  });
-  const conn = createConnection(wsURL({
-    role: 'player', code, playerId: creds.playerId, token: creds.playerToken,
-  }));
-  P.conn = conn;
-  conn.on('open', () => { P.connLost = false; render(); });
-  conn.on('data', handleMessage);
-  conn.on('close', (info) => {
-    if (!P.state && info && info.reason) {
-      P.error = info.reason;
-      session.remove('wlink_session');
-    } else {
-      P.connLost = true;
-    }
-    render();
-  });
-  conn.on('error', () => { P.connLost = true; render(); });
-  render();
-}
-
-// ---------------- actions ----------------
-
-Actions.joinRoom = async () => {
-  const name = ($('#playerName')?.value || '').trim();
-  const code = ($('#roomCodeInput')?.value || '').trim().toUpperCase();
-  if (!name || !code) { alert('Enter your name and the room code.'); return; }
-  sound.unlock();
-  try {
-    const res = await apiPost(`/api/rooms/${code}/players`, { name });
-    connectPlayer(code, name, { playerId: res.playerId, playerToken: res.playerToken });
-  } catch (e) {
-    P.error = e.message || 'Could not join that room.';
-    render();
-  }
-};
-
-Actions.reconnectNow = () => {
-  if (P.roomCode && P.myId && P.myToken) {
-    connectPlayer(P.roomCode, P.myName, { playerId: P.myId, playerToken: P.myToken });
-  }
-};
-
-Actions.retryJoin = () => {
-  setLocalView('playerSetup');
-  setRole(null);
-  session.remove('wlink_session');
-  P.conn = null;
-  P.roomCode = '';
-  P.myName = '';
-  P.myId = null;
-  P.myToken = null;
-  P.state = null;
-  P.error = null;
-  P.denied = null;
-  P.connLost = false;
-  P.localVoted = false;
-  P.voteDraft = null;
-  P.bankFlash = false;
-  P.renameError = null;
-  confettiSpawned = false;
-  render();
-};
-
-Actions.submitVote = () => {
-  const sel = $('#voteSelect');
-  if (!sel || !sel.value) return;
-  P.conn.send({ type: 'vote', targetId: sel.value });
-  P.localVoted = true;
-  P.voteDraft = null;
-  render();
-};
-
-Actions.callBank = () => {
-  P.conn.send({ type: 'callBank' });
-  sound.bank();
-  P.bankFlash = true;
-  render();
-  setTimeout(() => { P.bankFlash = false; render(); }, 2500);
-};
-
-Actions.renameMe = () => {
-  const input = $('#renameInput');
-  const newName = input ? input.value.trim() : '';
-  if (!newName || !P.conn) return;
-  P.renameError = null;
-  P.conn.send({ type: 'rename', newName });
-  render();
-};
-
-Changes.voteDraft = (el) => { P.voteDraft = el.value || null; };
-
-// ---------------- views ----------------
-
-export function playerSetupView() {
-  return `
-    <div class="landing">
-      <div class="setup-card">
-        <button class="back-link" data-action="goBack" type="button">&larr; Back</button>
-        <h2>Join a game</h2>
-        <label for="playerName">Your name</label>
-        <input id="playerName" maxlength="18" placeholder="e.g. Sam" autocomplete="off">
-        <label for="roomCodeInput">Room code</label>
-        <input id="roomCodeInput" class="room-code-input" maxlength="4" placeholder="ABCD" autocomplete="off" value="${esc(pendingJoinCode || '')}">
-        <button class="act-btn primary full-btn" data-action="joinRoom" type="button">Join room</button>
-      </div>
-    </div>
-  `;
-}
-
-export function playerRootView() {
-  if (P.error) {
-    return `
-      <div class="landing">
-        <div class="setup-card">
-          <div class="error-box">${esc(P.error)}</div>
-          <button class="act-btn primary full-btn" data-action="retryJoin" type="button">Try again</button>
-        </div>
-      </div>
-    `;
-  }
-
-  if (P.denied) {
-    return `
-      <div class="landing">
-        <div class="setup-card">
-          <div class="error-box">${esc(P.denied)}</div>
-          <button class="act-btn neutral full-btn" data-action="retryJoin" type="button">Back</button>
-        </div>
-      </div>
-    `;
-  }
-
-  if (!P.myId || !P.state) {
-    return `<div class="landing"><div class="center-msg">Connecting to the host&hellip;</div></div>`;
-  }
-
-  const s = P.state;
-  const me = getMe(s);
-
-  let body;
+function h2hSide(s, me) {
+  const h = s.h2h;
+  const p = currentOf(s);
+  const c = chaserOf(s);
+  const playing = me.isCurrent || me.isChaser;
   switch (s.phase) {
-    case 'lobby': body = playerLobbyView(s, me); break;
-    case 'countdown': body = playerCountdownView(s, me); break;
-    case 'playing': body = playerPlayingView(s, me); break;
-    case 'voting': body = playerVotingView(s, me); break;
-    case 'elimination': body = playerEliminationView(s, me); break;
-    case 'shootout': body = playerShootoutView(s, me); break;
-    case 'gameover': body = playerGameOverView(s, me); break;
-    default: body = '';
+    case 'h2h_ready':
+      return html`${boardHTML(s)}${wait('Get ready', me.isCurrent ? `You’re playing for ${money(s.offers.amount)}.` : me.isChaser ? `${p?.name} plays for ${money(s.offers.amount)}.` : `Help ${p?.name} bring it home.`)}`;
+    case 'h2h_question': {
+      const locked = h.myPick != null;
+      const otherLocked = me.isChaser ? h.playerLocked : h.chaserLocked;
+      return html`
+        ${boardHTML(s)}
+        <h2 class="q-text">${h.question}</h2>
+        ${optionsHTML(s, { buttons: playing, mine: h.myPick, locked })}
+        <p class="status">${!playing ? `Advise ${p?.name}…`
+          : locked ? (otherLocked ? 'Locked in. Revealing…' : 'Locked in. Waiting for the other side…')
+          : otherLocked ? html`Other side is in. <span class="clock" data-ends="${h.deadlineAt}" data-fmt="sec" data-warn="no">5</span>s left` : 'Choose your answer'}</p>`;
+    }
+    case 'h2h_reveal':
+      return html`${boardHTML(s)}<h2 class="q-text">${h.question}</h2>${optionsHTML(s)}
+        <p class="status">${h.reveal.playerRight ? `${p?.name} was right.` : `${p?.name} missed.`} ${h.reveal.chaserRight ? `${c?.name} was right.` : `${c?.name} missed.`}</p>`;
+    case 'h2h_over':
+      return html`${boardHTML(s)}${h.outcome === 'home'
+        ? html`<div class="banner home"><h2>Home!</h2><p>${money(s.offers.amount)} to the team</p></div>`
+        : html`<div class="banner caught"><h2>Caught</h2><p>${p?.name} is out</p></div>`}`;
+    default:
+      return '';
   }
-
-  return `
-    <div class="player-wrap">
-      <div class="p-header">
-        <div class="rc">ROOM ${esc(s.roomCode)}</div>
-      </div>
-      ${P.connLost ? `
-        <div class="banner">
-          Connection to host lost. Trying to reconnect&hellip;
-          <button class="link-btn" data-action="reconnectNow" type="button">Reconnect now</button>
-        </div>
-      ` : ''}
-      ${body}
-      <div class="footer-note">You are ${esc(P.myName)}</div>
-    </div>
-  `;
 }
 
-function playerLobbyView(s, me) {
-  return `
-    <div class="panel">
-      <h3>Waiting for the host to start&hellip;</h3>
-      <div class="roster">
-        ${s.players.map((p) => `
-          <div class="chip">
-            <span><span class="dot${p.connected ? '' : ' off'}"></span>${esc(p.name)}${p.id === s.myId ? ' (you)' : ''}</span>
-          </div>
-        `).join('')}
-      </div>
-    </div>
-    <div class="panel">
-      <h3>Change your name</h3>
-      ${P.renameError ? `<div class="error-box">${esc(P.renameError)}</div>` : ''}
-      <input id="renameInput" maxlength="18" value="${esc(me.name)}">
-      <button class="act-btn primary full-btn" data-action="renameMe" type="button">Save name</button>
-    </div>
-  `;
-}
-
-function playerCountdownView(s, me) {
-  const sub = s.shootout ? 'Final shootout starting…' : `Round ${s.round} starting…`;
-  return `
-    ${countdownHtml(sub)}
-    ${!me.alive ? `<div class="spectator-tag">You've been voted off — spectating</div>` : ''}
-  `;
-}
-
-function playerStatsHtml(me) {
-  const acc = accuracyOf(me);
-  return `
-    <div class="p-stats">
-      <div class="p-stat">
-        <b>${acc == null ? '—' : `${acc}%`}</b>
-        <span>Accuracy</span>
-      </div>
-      <div class="p-stat">
-        <b class="${statPop === 'correct' ? 'pop' : ''}">${me.correct}</b>
-        <span>Correct</span>
-      </div>
-      <div class="p-stat">
-        <b class="${statPop === 'incorrect' ? 'pop' : ''}">${me.incorrect}</b>
-        <span>Incorrect</span>
-      </div>
-    </div>
-  `;
-}
-
-function chainBankPanel(s) {
-  return `
-    <div class="panel">
-      ${ladderHtml(s.chainIndex)}
-      <div class="bank-total">
-        <div class="amt">${fmtMoney(s.bank)}</div>
-        <div class="lbl">In the bank</div>
-      </div>
-    </div>
-  `;
-}
-
-function playerPlayingView(s, me) {
-  if (!me.alive) {
-    return `
-      <div class="spectator-tag">You've been voted off — spectating</div>
-      ${chainBankPanel(s)}
-      ${everyoneProgress(s.players)}
-    `;
+function finalSide(s, me) {
+  const f = s.final;
+  const c = chaserOf(s);
+  switch (s.phase) {
+    case 'final_pick':
+      if (me.isChaser) return wait('The team is choosing', 'You’ll get the other set.');
+      if (!me.finalist) return wait('You were caught', 'Cheer on your team.');
+      return html`<div class="wait"><h2>Pick a question set</h2>
+        <div class="set-pick">
+          ${['A', 'B'].map((x) => html`<button class="set-btn ${me.vote === x ? 'chosen' : ''}" data-send="act" data-action="pickSet" data-arg='${JSON.stringify({ set: x })}'>Set ${x}</button>`)}
+        </div><p>${me.vote ? `You voted for set ${me.vote}.` : 'Majority wins.'}</p></div>`;
+    case 'final_team_ready':
+      return wait(me.isChaser ? 'The team is about to play' : `Team plays set ${f.teamSet}`, me.isChaser ? `Target will be ${f.target}.` : 'Buzz in when you know it.');
+    case 'final_team': {
+      const mine = f.buzzedBy === me.id;
+      const other = f.buzzedBy && !mine;
+      return html`
+        <div class="statbar">${clockEl(f.endsAt, { cls: 'lg' })}<span><b>${f.teamCorrect}</b> correct</span></div>
+        <h2 class="q-text">${f.question}</h2>
+        ${me.finalist ? html`<button class="buzzer ${mine ? 'won' : other ? 'lost' : ''}" data-send="act" data-action="buzz" ${f.buzzedBy ? 'disabled' : ''}>
+            ${mine ? 'You’re in: answer now' : other ? `${nameOf(s, f.buzzedBy)} is answering` : 'BUZZ'}</button>`
+          : html`<p class="status">${f.buzzedBy ? `${nameOf(s, f.buzzedBy)} buzzed in` : 'Buzzers are live'}</p>`}
+        ${trackHTML(f)}`;
+    }
+    case 'final_team_done':
+      return html`${wait(`${f.teamCorrect} + ${f.head} head start`, `${c?.name} needs ${f.target}.`)}${trackHTML(f)}`;
+    case 'final_chaser':
+    case 'final_push': {
+      const push = s.phase === 'final_push';
+      const mine = f.buzzedBy === me.id;
+      const other = f.buzzedBy && !mine;
+      return html`
+        <div class="statbar ${push ? 'stopped' : ''}">${push ? frozenEl(f.remainingMs) : clockEl(f.endsAt, { cls: 'lg' })}<span><b>${f.chaserCorrect}</b> of ${f.target}</span></div>
+        <h2 class="q-text">${f.question}</h2>
+        ${push && me.finalist
+          ? html`<button class="buzzer ${mine ? 'won' : other ? 'lost' : ''}" data-send="act" data-action="buzz" ${f.buzzedBy ? 'disabled' : ''}>
+              ${mine ? 'You’re in: answer for the team' : other ? `${nameOf(s, f.buzzedBy)} is answering` : 'BUZZ to push back'}</button>`
+          : html`<p class="status">${push ? 'Clock stopped. The team can push the chaser back.' : me.isChaser ? 'Say your answer out loud.' : `${c?.name} is answering…`}</p>`}
+        ${trackHTML(f)}`;
+    }
+    case 'gameover':
+      return html`${resultHTML(s)}${trackHTML(f)}`;
+    default:
+      return '';
   }
-
-  const yourTurn = s.currentAskedId === s.myId;
-  const askedPlayer = s.players.find((p) => p.id === s.currentAskedId);
-
-  return `
-    ${bigTimerHtml()}
-    ${playerStatsHtml(me)}
-    <div class="turn-flag ${yourTurn ? 'yours' : 'theirs'}${yourTurn && turnPop ? ' enter' : ''}">
-      ${yourTurn ? "You're on the spot!" : `${esc(askedPlayer ? askedPlayer.name : '…')} is answering`}
-    </div>
-    ${s.currentQuestion ? `
-      <div class="stage">
-        <div class="q-text">${esc(s.currentQuestion.q)}</div>
-      </div>
-    ` : ''}
-    ${chainBankPanel(s)}
-    ${yourTurn ? `
-      <button class="act-btn bank full-btn" data-action="callBank" type="button" ${s.chainIndex < 0 ? 'disabled' : ''}>
-        ${P.bankFlash ? 'Banked! \u{1F3E6}' : `Bank the chain now (${fmtMoney(s.chainValue)})`}
-      </button>
-    ` : ''}
-  `;
 }
 
-function playerVotingView(s, me) {
-  if (s.revealing && s.revealInfo) {
-    const info = s.revealInfo;
-    return `
-      ${!me.alive ? `<div class="spectator-tag">You've been voted off — spectating</div>` : ''}
-      <div class="center-msg">Revealing vote ${info.index} of ${info.total}</div>
-      <div class="vote-grid">
-        <div class="vote-row">
-          <span>${esc(info.voterName)} voted for</span>
-          <span class="${info.votedForName ? 'yes' : 'no'}">${info.votedForName ? esc(info.votedForName) : 'No one — no vote cast'}</span>
-        </div>
-      </div>
-    `;
+function body(s) {
+  const me = s.me;
+  const p = currentOf(s);
+  const c = chaserOf(s);
+  if (!me) return wait('Reconnecting…');
+
+  if (s.phase.startsWith('h2h_')) return h2hSide(s, me);
+  if (s.phase.startsWith('final_') || s.phase === 'gameover') return finalSide(s, me);
+
+  switch (s.phase) {
+    case 'lobby':
+      return html`${wait(me.isChaser ? 'You’re the Chaser' : 'You’re in', 'Waiting for the quizmaster to start.')}${rosterChips(s)}`;
+    case 'between':
+      return html`${wait(me.isChaser ? 'Next contestant coming up' : 'Who’s next?')}${rosterChips(s)}`;
+    case 'cb_ready':
+      return wait(me.isCurrent ? 'You’re up' : `${p?.name} is up`, me.isCurrent ? `Cash builder: ${s.cfg.cbSeconds} seconds. Answer out loud.` : 'Cash builder is about to start.');
+    case 'cb_playing':
+      return html`<div class="statbar">${clockEl(s.cb.endsAt, { fmt: 'sec', cls: 'lg' })}<span><b>${s.cb.correct}</b> correct · ${money(s.cb.total)}</span></div>
+        <h2 class="q-text">${me.isCurrent || me.isChaser ? '' : s.cb.question}</h2>
+        ${me.isCurrent ? wait('Answer out loud', 'The quizmaster is marking you.') : ''}`;
+    case 'cb_done':
+      return wait(`${p?.name} built ${money(s.cb.total)}`, me.isChaser ? 'Time to think about your offers.' : '');
+    case 'offers_set':
+      return me.isChaser ? html`<h2 class="pad-title">Make your offers</h2>${offerForm(s)}`
+        : wait(me.isCurrent ? `${c?.name} is deciding…` : `${c?.name} is making an offer`, `${p?.name} has ${money(s.offers.middle)}.`);
+    case 'offers_choose':
+      return me.isCurrent ? html`<h2 class="pad-title">Your offers</h2>${offerChoice(s)}`
+        : html`${wait(me.isChaser ? `${p?.name} is choosing` : `Advise ${p?.name}`, 'The offers are on the big screen.')}
+            <p class="status">${money(s.offers.higher)} · ${money(s.offers.middle)} · ${money(s.offers.lower)}</p>`;
+    default:
+      return '';
   }
-
-  if (!me.alive) {
-    return `
-      <div class="spectator-tag">You've been voted off — spectating</div>
-      <div class="center-msg">The remaining players are voting on the weakest link.</div>
-      ${everyoneProgress(s.players)}
-    `;
-  }
-
-  if (s.votedAlready || P.localVoted) {
-    return `<div class="center-msg">Vote submitted — waiting for the rest of the group&hellip;</div>`;
-  }
-
-  const candidates = s.players.filter((p) => p.alive && p.id !== s.myId);
-  return `
-    <div class="center-msg">Who's the weakest link?</div>
-    <select id="voteSelect" data-bind="voteDraft">
-      ${candidates.map((p) => `<option value="${p.id}"${P.voteDraft === p.id ? ' selected' : ''}>${esc(p.name)}</option>`).join('')}
-    </select>
-    <button class="act-btn primary full-btn" data-action="submitVote" type="button">Submit vote</button>
-  `;
 }
 
-function playerEliminationView(s, me) {
-  const elim = s.lastElimination;
-  return `
-    <div class="elim-card">
-      ${elim ? `
-        <div class="name">${esc(elim.name)}</div>
-        ${elim.note ? `<div class="center-msg">${esc(elim.note)}</div>` : ''}
-        ${tallyHtml(elim.tally)}
-      ` : ''}
-    </div>
-    ${me.alive
-      ? `<div class="center-msg">Get ready for the next round&hellip;</div>`
-      : `<div class="spectator-tag">You've been voted off — spectating</div>${everyoneProgress(s.players)}`}
-  `;
-}
-
-const SHOOTOUT_REGULATION_ROUNDS = 5;
-
-// Regulation is always 5 slots; sudden death keeps appending beyond that —
-// showing every round played (instead of a hardcoded 5) is what makes
-// sudden-death progress visible instead of looking frozen.
-function shootoutKicks(shootout, slotKey) {
-  const rounds = shootout.rounds || [];
-  const slotCount = Math.max(SHOOTOUT_REGULATION_ROUNDS, rounds.length);
-  let html = '';
-  for (let i = 0; i < slotCount; i++) {
-    const round = rounds[i];
-    const val = round ? round[slotKey] : undefined;
-    const impact = freshKick && freshKick.index === i && freshKick.side === slotKey ? ' kick-impact' : '';
-    if (val === 'correct') html += `<div class="kick hit${impact}">✓</div>`;
-    else if (val === 'incorrect') html += `<div class="kick miss${impact}">✗</div>`;
-    else html += '<div class="kick"></div>';
-  }
-  return html;
-}
-
-function playerShootoutView(s, me) {
-  const shootout = s.shootout;
-  if (!shootout) return '';
-
-  const mine = shootout.order.some((o) => o.id === s.myId);
-  const [p0, p1] = shootout.order;
-  // currentTurn is an integer index (0 or 1) into shootout.order, not a player id.
-  const turnPlayer = shootout.order[shootout.currentTurn];
-  const myTurn = mine && turnPlayer && turnPlayer.id === s.myId;
-  const suddenRound = shootout.currentRoundIndex - SHOOTOUT_REGULATION_ROUNDS + 1;
-  const askedName = turnPlayer ? turnPlayer.name : '';
-  const stageBody = shootout.currentQuestion
-    ? `<div class="q-text">${esc(shootout.currentQuestion.q)}</div>`
-    : `<div class="q-text" style="color:var(--blue)">Up next: ${esc(askedName)}</div>`;
-
-  return `
-    ${!mine ? `<div class="spectator-tag">You've been voted off — spectating</div>` : ''}
-    ${shootout.sudden ? `<div class="banner">Sudden death — round ${suddenRound}!</div>` : ''}
-    <div class="duel">
-      <div class="duel-side${shootout.currentTurn === 0 ? ' active' : ''}">
-        <div class="nm">${esc(p0.name)}</div>
-        <div class="kicks">${shootoutKicks(shootout, 'p0')}</div>
-      </div>
-      <div class="duel-side${shootout.currentTurn === 1 ? ' active' : ''}">
-        <div class="nm">${esc(p1.name)}</div>
-        <div class="kicks">${shootoutKicks(shootout, 'p1')}</div>
-      </div>
-    </div>
-    <div class="stage">${stageBody}</div>
-    ${mine
-      ? `<div class="turn-flag ${myTurn ? 'yours' : 'theirs'}${myTurn && turnPop ? ' enter' : ''}">${myTurn ? "You're up!" : 'Waiting for your turn'}</div>`
-      : `<div class="turn-flag theirs">${esc(turnPlayer ? turnPlayer.name : '…')}'s turn</div>${everyoneProgress(s.players)}`}
-  `;
-}
-
-function playerGameOverView(s, me) {
-  return `
-    <div class="gameover">
-      <div class="trophy">\u{1F3C6}</div>
-      <div class="winner">${esc(s.winner)} wins!</div>
-      <div class="bank-total">
-        <div class="amt">${fmtMoney(s.bank)}</div>
-        <div class="lbl">Final bank</div>
-      </div>
-      <div class="center-msg">${s.winner === me.name ? 'That’s you \u{1F389}' : 'Thanks for playing!'}</div>
-      ${standingsHtml(s.players)}
-    </div>
-  `;
+export function playerView(s, ctx) {
+  const me = s.me;
+  const role = !me ? '' : me.isChaser ? 'chaser' : me.isCurrent ? 'hotseat' : 'contestant';
+  return html`
+    <div class="phone ${role}">
+      <header class="bar">
+        <b>${me?.name ?? ''}</b>
+        <span class="pill ${role}">${me?.isChaser ? 'Chaser' : me?.isCurrent ? 'In the hot seat' : me?.finalist ? 'Finalist' : 'Contestant'}</span>
+        <span class="code">${s.code}</span>
+      </header>
+      ${ctx.error ? html`<div class="toast" role="alert">${ctx.error}</div>` : ''}
+      ${ctx.offline ? html`<div class="toast" role="status">Reconnecting…</div>` : ''}
+      <main>${body(s)}</main>
+    </div>`;
 }

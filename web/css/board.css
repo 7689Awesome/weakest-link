@@ -1,0 +1,48 @@
+/* The funnel board: chaser pad at the top, seven steps, home at the bottom. */
+.board {
+  --rh: 40px;
+  display: flex; flex-direction: column; gap: 3px; background: var(--ink);
+  clip-path: polygon(0 0, 100% 0, 86% 100%, 14% 100%);
+  width: 100%; max-width: 560px; margin: 0 auto;
+}
+.board .row {
+  position: relative; height: var(--rh); display: flex; align-items: center; justify-content: center;
+  color: var(--chalk); font-family: var(--display); font-weight: 800;
+  background: linear-gradient(180deg, var(--blue), var(--blue-d));
+  filter: brightness(calc(1 - var(--i) * .035));
+}
+.row.pad { background: linear-gradient(180deg, #e33440, var(--red-d)); height: calc(var(--rh) * 1.5); filter: none; }
+.row.pad .chev { position: absolute; inset: 14% 8%; width: 84%; height: 72%; fill: none; stroke: rgba(10, 6, 10, .7); stroke-width: 9; stroke-linejoin: miter; }
+.row.gap { background: linear-gradient(180deg, #25d6cf, var(--teal-d, #0e8d95)); filter: none; }
+.row.past { background: linear-gradient(180deg, #3a1a3a, #26122e); filter: none; }
+.row.ahead { }
+.row.has-chaser { background: linear-gradient(180deg, #ee4752, var(--red-d)); filter: none; }
+.row.has-player { background: linear-gradient(180deg, #0c1a63, #070f3d); filter: none; box-shadow: inset 0 0 0 3px rgba(255, 255, 255, .85); }
+.row.caught { background: repeating-linear-gradient(135deg, var(--red) 0 12px, #fff 12px 24px); filter: none; color: var(--ink); }
+.row.homerow { background: linear-gradient(180deg, #ffd96b, #d99a14); color: var(--ink); height: calc(var(--rh) * 1.3); filter: none; }
+.row.homerow.has-player { background: linear-gradient(180deg, #4ce393, #1fae63); }
+.homelabel { font-size: calc(var(--rh) * .75); letter-spacing: .04em; }
+
+.who { display: flex; align-items: center; gap: .6em; font-size: calc(var(--rh) * .62); line-height: 1; white-space: nowrap; }
+.who.p .amt { font-size: calc(var(--rh) * .78); color: #fff; }
+.who.p small { font: 500 .45em var(--body); color: #b8c4ff; }
+.who.c b { color: #fff; text-shadow: 0 1px 0 rgba(0, 0, 0, .4); }
+.row.caught .who { background: rgba(6, 10, 27, .85); color: #fff; padding: 0 .6em; border-radius: 6px; margin: 0 .3em; }
+.arr { width: 0; height: 0; border: calc(var(--rh) * .24) solid transparent; }
+.arr.l { border-right-color: #cfd8ff; border-left-width: 0; }
+.arr.r { border-left-color: #cfd8ff; border-right-width: 0; }
+
+/* final chase track */
+.track-wrap { margin: 1.2rem 0; }
+.track { display: flex; gap: 2px; height: 2.1rem; padding: 3px; background: var(--ink); border-radius: 8px; border: 1px solid var(--line); }
+.seg { flex: 1 1 0; min-width: 3px; border-radius: 2px; background: var(--teal); }
+.seg.head { background: var(--teal-l); }
+.seg.team { background: var(--teal); }
+.seg.push { background: var(--gold); }
+.seg.chased { background: var(--red); }
+.track-key { display: flex; flex-wrap: wrap; gap: .4rem 1.1rem; margin-top: .55rem; font-size: .85rem; color: var(--muted); }
+.track-key span { display: inline-flex; align-items: center; gap: .4rem; }
+.track-key .seg { flex: none; display: inline-block; width: .9rem; height: .9rem; }
+
+/* the pad stays red after the chaser steps off it, just dimmer */
+.row.pad.past { background: linear-gradient(180deg, #b01d28, #6d1019); }
